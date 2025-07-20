@@ -1,0 +1,20 @@
+{
+  "server": {
+    "host": "localhost",
+    "port": 8801,
+    "protocol": "http",
+    "name": "TMF620 Mock API Server",
+    "version": "1.0.0",
+    "description": "Mock implementation of TMF620 Product Catalog Management API"
+  },
+  "api": {
+    "base_path": "/tmf-api/productCatalogManagement/v4",
+    "version": "4.0.0",
+    "title": "TMF620 Product Catalog Management"
+  },
+  "features": {
+    "enable_cors": true,
+    "enable_docs": true,
+    "enable_mcp": true
+  }
+}

@@ -1,9 +1,18 @@
 import requests
 import json
+import os
 from pprint import pprint
 
+# Load configuration from JSON file
+def load_config():
+    config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+    with open(config_path, 'r') as f:
+        return json.load(f)
+
+config = load_config()
+
 # Base URL for the mock TMF620 API
-BASE_URL = "http://localhost:8000/tmf-api/productCatalogManagement/v4"
+BASE_URL = config['tmf620_api']['url']
 
 def get_catalogs():
     """Get all catalogs"""

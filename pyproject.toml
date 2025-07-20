@@ -1,0 +1,50 @@
+[project]
+name = "tmf620-mcp-server"
+version = "1.0.0"
+description = "TMF620 Product Catalog Management MCP Server with Mock API"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.0.0",
+    "requests>=2.31.0",
+    "mcp>=1.0.0",
+    "fastapi-mcp>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+tmf620-mock-server = "mock_tmf620_api_fastapi:main"
+tmf620-mcp-server = "tmf620_mcp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+include = [
+    "tmf620_mcp_server.py",
+    "mock_tmf620_api_fastapi.py", 
+    "tmf620_client.py",
+    "config.json",
+    "mock_server_config.json"
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']

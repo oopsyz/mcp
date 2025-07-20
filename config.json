@@ -1,0 +1,22 @@
+{
+  "mcp_server": {
+    "host": "localhost",
+    "port": 7701,
+    "name": "TMF620 Product Catalog API",
+    "version": "1.0.0",
+    "instructions": "This MCP server allows AI agents to interact with a remote TMF620 Product Catalog Management API. You can use it to list, retrieve, and create catalogs, product offerings, and product specifications."
+  },
+  "tmf620_api": {
+    "url": "http://localhost:8801/tmf-api/productCatalogManagement/v4"
+  },
+  "endpoints": {
+    "catalog_list": "/catalog",
+    "catalog_detail": "/catalog/{id}",
+    "product_offering_list": "/productOffering",
+    "product_offering_detail": "/productOffering/{id}",
+    "product_specification_list": "/productSpecification",
+    "product_specification_detail": "/productSpecification/{id}",
+    "product_offering_create": "/productOffering",
+    "schema": "/schema"
+  }
+}
