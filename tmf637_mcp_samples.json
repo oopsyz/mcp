@@ -1,0 +1,615 @@
+{
+  "samples": {
+    "get_available_specs": {
+      "request": {
+        "tool_calls": [
+          {
+            "name": "get_available_specs",
+            "parameters": {}
+          }
+        ]
+      },
+      "response": {
+        "tool_responses": [
+          {
+            "name": "get_available_specs",
+            "content": {
+              "specs": [
+                "TMF637-ProductInventory-v5.0.0.oas"
+              ]
+            },
+            "status": "success"
+          }
+        ]
+      }
+    },
+    "get_product_inventory": {
+      "request": {
+        "tool_calls": [
+          {
+            "name": "get_product_inventory",
+            "parameters": {
+              "spec_name": "TMF637-ProductInventory-v5.0.0.oas",
+              "filter_params": {
+                "status": "active"
+              }
+            }
+          }
+        ]
+      },
+      "response": {
+        "tool_responses": [
+          {
+            "name": "get_product_inventory",
+            "content": {
+              "products": [
+                {
+                  "id": "product-1",
+                  "href": "/tmf-api/productInventory/v5/product/product-1",
+                  "description": "Fiber broadband service with 1Gbps download speed",
+                  "isBundle": false,
+                  "isCustomerVisible": true,
+                  "name": "Fiber Broadband Pro",
+                  "orderDate": "2024-05-15T10:30:00Z",
+                  "productSerialNumber": "FB-10045872",
+                  "startDate": "2024-05-20T00:00:00Z",
+                  "terminationDate": "2026-05-20T00:00:00Z",
+                  "status": "active",
+                  "productOffering": {
+                    "id": "offering-1001",
+                    "href": "/tmf-api/productCatalog/v5/productOffering/offering-1001",
+                    "name": "Fiber Broadband Pro Plan",
+                    "@type": "ProductOfferingRef"
+                  },
+                  "productSpecification": {
+                    "id": "spec-fb-1000",
+                    "href": "/tmf-api/productCatalog/v5/productSpecification/spec-fb-1000",
+                    "name": "Fiber Broadband 1Gbps Specification",
+                    "version": "2.1",
+                    "@type": "ProductSpecificationRef"
+                  },
+                  "productCharacteristic": [
+                    {
+                      "name": "downloadSpeed",
+                      "valueType": "string",
+                      "value": "1 Gbps"
+                    },
+                    {
+                      "name": "uploadSpeed",
+                      "valueType": "string",
+                      "value": "500 Mbps"
+                    },
+                    {
+                      "name": "staticIP",
+                      "valueType": "boolean",
+                      "value": "true"
+                    }
+                  ],
+                  "realizingService": [
+                    {
+                      "id": "service-fb-1001",
+                      "href": "/tmf-api/serviceInventory/v5/service/service-fb-1001",
+                      "name": "Fiber Internet Connection",
+                      "@type": "ServiceRef"
+                    }
+                  ],
+                  "relatedParty": [
+                    {
+                      "id": "customer-12345",
+                      "href": "/tmf-api/partyManagement/v5/individual/customer-12345",
+                      "name": "John Smith",
+                      "role": "customer",
+                      "@type": "RelatedParty"
+                    }
+                  ],
+                  "@type": "Product"
+                },
+                {
+                  "id": "product-3",
+                  "href": "/tmf-api/productInventory/v5/product/product-3",
+                  "description": "Premium TV streaming service with 200+ channels",
+                  "isBundle": false,
+                  "isCustomerVisible": true,
+                  "name": "TV Streaming Premium",
+                  "orderDate": "2024-06-10T14:20:00Z",
+                  "productSerialNumber": "TV-20087651",
+                  "startDate": "2024-06-15T00:00:00Z",
+                  "status": "active",
+                  "productOffering": {
+                    "id": "offering-2002",
+                    "href": "/tmf-api/productCatalog/v5/productOffering/offering-2002",
+                    "name": "TV Streaming Premium Plan",
+                    "@type": "ProductOfferingRef"
+                  },
+                  "productSpecification": {
+                    "id": "spec-tv-200",
+                    "href": "/tmf-api/productCatalog/v5/productSpecification/spec-tv-200",
+                    "name": "TV Streaming Premium Specification",
+                    "version": "3.0",
+                    "@type": "ProductSpecificationRef"
+                  },
+                  "productCharacteristic": [
+                    {
+                      "name": "channels",
+                      "valueType": "integer",
+                      "value": "210"
+                    },
+                    {
+                      "name": "hdChannels",
+                      "valueType": "integer",
+                      "value": "150"
+                    },
+                    {
+                      "name": "recordingStorage",
+                      "valueType": "string",
+                      "value": "500 hours"
+                    }
+                  ],
+                  "realizingService": [
+                    {
+                      "id": "service-tv-2001",
+                      "href": "/tmf-api/serviceInventory/v5/service/service-tv-2001",
+                      "name": "TV Streaming Service",
+                      "@type": "ServiceRef"
+                    }
+                  ],
+                  "relatedParty": [
+                    {
+                      "id": "customer-12345",
+                      "href": "/tmf-api/partyManagement/v5/individual/customer-12345",
+                      "name": "John Smith",
+                      "role": "customer",
+                      "@type": "RelatedParty"
+                    }
+                  ],
+                  "@type": "Product"
+                }
+              ]
+            },
+            "status": "success"
+          }
+        ]
+      }
+    },
+    "get_product_by_id": {
+      "request": {
+        "tool_calls": [
+          {
+            "name": "get_product_by_id",
+            "parameters": {
+              "spec_name": "TMF637-ProductInventory-v5.0.0.oas",
+              "product_id": "product-2"
+            }
+          }
+        ]
+      },
+      "response": {
+        "tool_responses": [
+          {
+            "name": "get_product_by_id",
+            "content": {
+              "product": {
+                "id": "product-2",
+                "href": "/tmf-api/productInventory/v5/product/product-2",
+                "description": "5G mobile service with unlimited data",
+                "isBundle": false,
+                "isCustomerVisible": true,
+                "name": "5G Mobile Unlimited",
+                "orderDate": "2024-04-20T09:15:00Z",
+                "productSerialNumber": "5G-30056429",
+                "startDate": "2024-04-25T00:00:00Z",
+                "terminationDate": "2025-04-25T00:00:00Z",
+                "status": "active",
+                "productOffering": {
+                  "id": "offering-3001",
+                  "href": "/tmf-api/productCatalog/v5/productOffering/offering-3001",
+                  "name": "5G Mobile Unlimited Plan",
+                  "@type": "ProductOfferingRef"
+                },
+                "productSpecification": {
+                  "id": "spec-5g-unlimited",
+                  "href": "/tmf-api/productCatalog/v5/productSpecification/spec-5g-unlimited",
+                  "name": "5G Mobile Unlimited Specification",
+                  "version": "1.5",
+                  "@type": "ProductSpecificationRef"
+                },
+                "productCharacteristic": [
+                  {
+                    "name": "dataAllowance",
+                    "valueType": "string",
+                    "value": "Unlimited"
+                  },
+                  {
+                    "name": "voiceMinutes",
+                    "valueType": "string",
+                    "value": "Unlimited"
+                  },
+                  {
+                    "name": "textMessages",
+                    "valueType": "string",
+                    "value": "Unlimited"
+                  },
+                  {
+                    "name": "roamingCountries",
+                    "valueType": "integer",
+                    "value": "42"
+                  }
+                ],
+                "realizingService": [
+                  {
+                    "id": "service-5g-3001",
+                    "href": "/tmf-api/serviceInventory/v5/service/service-5g-3001",
+                    "name": "5G Mobile Connection",
+                    "@type": "ServiceRef"
+                  }
+                ],
+                "relatedParty": [
+                  {
+                    "id": "customer-12345",
+                    "href": "/tmf-api/partyManagement/v5/individual/customer-12345",
+                    "name": "John Smith",
+                    "role": "customer",
+                    "@type": "RelatedParty"
+                  }
+                ],
+                "@type": "Product"
+              }
+            },
+            "status": "success"
+          }
+        ]
+      }
+    },
+    "create_product": {
+      "request": {
+        "tool_calls": [
+          {
+            "name": "create_product",
+            "parameters": {
+              "spec_name": "TMF637-ProductInventory-v5.0.0.oas",
+              "product_data": {
+                "description": "Cloud storage service with 1TB capacity",
+                "isBundle": false,
+                "isCustomerVisible": true,
+                "name": "Cloud Storage Enterprise",
+                "orderDate": "2025-07-20T11:30:00Z",
+                "productSerialNumber": "CS-50012345",
+                "startDate": "2025-07-25T00:00:00Z",
+                "status": "active",
+                "productOffering": {
+                  "id": "offering-4001",
+                  "href": "/tmf-api/productCatalog/v5/productOffering/offering-4001",
+                  "name": "Cloud Storage Enterprise Plan",
+                  "@type": "ProductOfferingRef"
+                },
+                "productSpecification": {
+                  "id": "spec-cs-1tb",
+                  "href": "/tmf-api/productCatalog/v5/productSpecification/spec-cs-1tb",
+                  "name": "Cloud Storage 1TB Specification",
+                  "version": "2.0",
+                  "@type": "ProductSpecificationRef"
+                },
+                "productCharacteristic": [
+                  {
+                    "name": "storageCapacity",
+                    "valueType": "string",
+                    "value": "1 TB"
+                  },
+                  {
+                    "name": "encryptionLevel",
+                    "valueType": "string",
+                    "value": "256-bit AES"
+                  },
+                  {
+                    "name": "backupFrequency",
+                    "valueType": "string",
+                    "value": "Daily"
+                  }
+                ],
+                "relatedParty": [
+                  {
+                    "id": "customer-12345",
+                    "href": "/tmf-api/partyManagement/v5/individual/customer-12345",
+                    "name": "John Smith",
+                    "role": "customer",
+                    "@type": "RelatedParty"
+                  }
+                ],
+                "@type": "Product"
+              }
+            }
+          }
+        ]
+      },
+      "response": {
+        "tool_responses": [
+          {
+            "name": "create_product",
+            "content": {
+              "product": {
+                "id": "product-4",
+                "href": "/tmf-api/productInventory/v5/product/product-4",
+                "description": "Cloud storage service with 1TB capacity",
+                "isBundle": false,
+                "isCustomerVisible": true,
+                "name": "Cloud Storage Enterprise",
+                "orderDate": "2025-07-20T11:30:00Z",
+                "productSerialNumber": "CS-50012345",
+                "startDate": "2025-07-25T00:00:00Z",
+                "status": "active",
+                "creationDate": "2025-07-20T11:30:00Z",
+                "productOffering": {
+                  "id": "offering-4001",
+                  "href": "/tmf-api/productCatalog/v5/productOffering/offering-4001",
+                  "name": "Cloud Storage Enterprise Plan",
+                  "@type": "ProductOfferingRef"
+                },
+                "productSpecification": {
+                  "id": "spec-cs-1tb",
+                  "href": "/tmf-api/productCatalog/v5/productSpecification/spec-cs-1tb",
+                  "name": "Cloud Storage 1TB Specification",
+                  "version": "2.0",
+                  "@type": "ProductSpecificationRef"
+                },
+                "productCharacteristic": [
+                  {
+                    "name": "storageCapacity",
+                    "valueType": "string",
+                    "value": "1 TB"
+                  },
+                  {
+                    "name": "encryptionLevel",
+                    "valueType": "string",
+                    "value": "256-bit AES"
+                  },
+                  {
+                    "name": "backupFrequency",
+                    "valueType": "string",
+                    "value": "Daily"
+                  }
+                ],
+                "relatedParty": [
+                  {
+                    "id": "customer-12345",
+                    "href": "/tmf-api/partyManagement/v5/individual/customer-12345",
+                    "name": "John Smith",
+                    "role": "customer",
+                    "@type": "RelatedParty"
+                  }
+                ],
+                "@type": "Product"
+              }
+            },
+            "status": "success"
+          }
+        ]
+      }
+    },
+    "update_product": {
+      "request": {
+        "tool_calls": [
+          {
+            "name": "update_product",
+            "parameters": {
+              "spec_name": "TMF637-ProductInventory-v5.0.0.oas",
+              "product_id": "product-3",
+              "product_data": {
+                "description": "Premium TV streaming service with 250+ channels (upgraded)",
+                "name": "TV Streaming Premium Plus",
+                "status": "active",
+                "productCharacteristic": [
+                  {
+                    "name": "channels",
+                    "valueType": "integer",
+                    "value": "250"
+                  },
+                  {
+                    "name": "hdChannels",
+                    "valueType": "integer",
+                    "value": "180"
+                  },
+                  {
+                    "name": "recordingStorage",
+                    "valueType": "string",
+                    "value": "1000 hours"
+                  },
+                  {
+                    "name": "4kChannels",
+                    "valueType": "integer",
+                    "value": "30"
+                  }
+                ],
+                "@type": "Product"
+              }
+            }
+          }
+        ]
+      },
+      "response": {
+        "tool_responses": [
+          {
+            "name": "update_product",
+            "content": {
+              "product": {
+                "id": "product-3",
+                "href": "/tmf-api/productInventory/v5/product/product-3",
+                "description": "Premium TV streaming service with 250+ channels (upgraded)",
+                "isBundle": false,
+                "isCustomerVisible": true,
+                "name": "TV Streaming Premium Plus",
+                "orderDate": "2024-06-10T14:20:00Z",
+                "productSerialNumber": "TV-20087651",
+                "startDate": "2024-06-15T00:00:00Z",
+                "status": "active",
+                "lastUpdate": "2025-07-22T15:45:30Z",
+                "productOffering": {
+                  "id": "offering-2002",
+                  "href": "/tmf-api/productCatalog/v5/productOffering/offering-2002",
+                  "name": "TV Streaming Premium Plan",
+                  "@type": "ProductOfferingRef"
+                },
+                "productSpecification": {
+                  "id": "spec-tv-200",
+                  "href": "/tmf-api/productCatalog/v5/productSpecification/spec-tv-200",
+                  "name": "TV Streaming Premium Specification",
+                  "version": "3.0",
+                  "@type": "ProductSpecificationRef"
+                },
+                "productCharacteristic": [
+                  {
+                    "name": "channels",
+                    "valueType": "integer",
+                    "value": "250"
+                  },
+                  {
+                    "name": "hdChannels",
+                    "valueType": "integer",
+                    "value": "180"
+                  },
+                  {
+                    "name": "recordingStorage",
+                    "valueType": "string",
+                    "value": "1000 hours"
+                  },
+                  {
+                    "name": "4kChannels",
+                    "valueType": "integer",
+                    "value": "30"
+                  }
+                ],
+                "realizingService": [
+                  {
+                    "id": "service-tv-2001",
+                    "href": "/tmf-api/serviceInventory/v5/service/service-tv-2001",
+                    "name": "TV Streaming Service",
+                    "@type": "ServiceRef"
+                  }
+                ],
+                "relatedParty": [
+                  {
+                    "id": "customer-12345",
+                    "href": "/tmf-api/partyManagement/v5/individual/customer-12345",
+                    "name": "John Smith",
+                    "role": "customer",
+                    "@type": "RelatedParty"
+                  }
+                ],
+                "@type": "Product"
+              }
+            },
+            "status": "success"
+          }
+        ]
+      }
+    },
+    "delete_product": {
+      "request": {
+        "tool_calls": [
+          {
+            "name": "delete_product",
+            "parameters": {
+              "spec_name": "TMF637-ProductInventory-v5.0.0.oas",
+              "product_id": "product-2"
+            }
+          }
+        ]
+      },
+      "response": {
+        "tool_responses": [
+          {
+            "name": "delete_product",
+            "content": {
+              "deleted": true,
+              "product": {
+                "id": "product-2",
+                "href": "/tmf-api/productInventory/v5/product/product-2",
+                "description": "5G mobile service with unlimited data",
+                "name": "5G Mobile Unlimited",
+                "status": "active",
+                "@type": "Product"
+              }
+            },
+            "status": "success"
+          }
+        ]
+      }
+    },
+    "error_example": {
+      "request": {
+        "tool_calls": [
+          {
+            "name": "get_product_by_id",
+            "parameters": {
+              "spec_name": "TMF637-ProductInventory-v5.0.0.oas",
+              "product_id": "non-existent-id"
+            }
+          }
+        ]
+      },
+      "response": {
+        "tool_responses": [
+          {
+            "name": "get_product_by_id",
+            "content": {},
+            "status": "error",
+            "error": "Product with ID non-existent-id not found"
+          }
+        ]
+      }
+    },
+    "multiple_tool_calls": {
+      "request": {
+        "tool_calls": [
+          {
+            "name": "get_available_specs",
+            "parameters": {}
+          },
+          {
+            "name": "get_product_inventory",
+            "parameters": {
+              "spec_name": "TMF637-ProductInventory-v5.0.0.oas",
+              "filter_params": {
+                "status": "active"
+              }
+            }
+          }
+        ]
+      },
+      "response": {
+        "tool_responses": [
+          {
+            "name": "get_available_specs",
+            "content": {
+              "specs": [
+                "TMF637-ProductInventory-v5.0.0.oas"
+              ]
+            },
+            "status": "success"
+          },
+          {
+            "name": "get_product_inventory",
+            "content": {
+              "products": [
+                {
+                  "id": "product-1",
+                  "href": "/tmf-api/productInventory/v5/product/product-1",
+                  "name": "Fiber Broadband Pro",
+                  "status": "active",
+                  "@type": "Product"
+                },
+                {
+                  "id": "product-3",
+                  "href": "/tmf-api/productInventory/v5/product/product-3",
+                  "name": "TV Streaming Premium",
+                  "status": "active",
+                  "@type": "Product"
+                }
+              ]
+            },
+            "status": "success"
+          }
+        ]
+      }
+    }
+  }
+}

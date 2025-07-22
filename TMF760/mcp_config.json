@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "tmf760-product-configuration": {
+      "command": "python",
+      "args": ["tmf760_mcp_server.py"],
+      "cwd": ".",
+      "env": {
+        "TMF760_BASE_URL": "http://localhost:8760"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "tmf760_health_check",
+        "tmf760_list_check_configurations",
+        "tmf760_list_query_configurations"
+      ]
+    }
+  }
+}

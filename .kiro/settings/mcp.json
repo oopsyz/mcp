@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "tmf637": {
+      "command": "python",
+      "args": ["tmf637_mcp_server.py"],
+      "env": {
+        "PYTHONPATH": "."
+      },
+      "disabled": false,
+      "autoApprove": ["get_available_specs", "get_product_inventory", "get_product_by_id"]
+    }
+  }
+}
