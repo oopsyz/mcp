@@ -1,5 +1,7 @@
 # TMF620 CLI + MCP Server
 
+We added the `TMF620` CLI to better support AI agents, especially in shell-first workflows where direct command execution is simpler than MCP integration alone.
+
 TMF620 Product Catalog Management with three layers:
 
 - a mock TMF620 API
