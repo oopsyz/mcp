@@ -1,8 +1,8 @@
-# TMF620 MCP Server - Quick Start
+# TMF620 Quick Start
 
 ## Prerequisites
 
-Install `uv` (recommended) or ensure Python 3.8+ is available:
+Install `uv` or ensure Python 3.10+ is available:
 
 ```bash
 # Install uv
@@ -11,42 +11,56 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 pip install uv
 ```
 
-**Note**: `uv` will automatically create a `.venv/` directory in your project folder to isolate dependencies.
+`uv` will create a local `.venv/` automatically when you run `uv sync`.
 
-## Start MCP Server Only
-
-### Option 1: Console Script (Recommended)
+## Start The Mock API
 
 ```bash
-# Install dependencies and start MCP server
-uv sync && uv run tmf620-mcp-server
+uv sync
+uv run tmf620-mock-server
 ```
 
-### Option 2: Direct File Execution
+The default TMF620 API base URL is `http://localhost:8801/tmf-api/productCatalogManagement/v4`.
+
+## Use The CLI
+
+The CLI talks directly to the configured TMF620 API URL. With the default `config.json`, that means it talks directly to the mock server running on port `8801`.
 
 ```bash
-uv run python tmf620_mcp_server.py
+# Check API health
+uv run tmf620 health
+
+# Discover command surface as JSON
+uv run tmf620 discover
+
+# List catalogs
+uv run tmf620 catalog list
+
+# Get one catalog
+uv run tmf620 catalog get cat-001
+
+# List offerings for a catalog
+uv run tmf620 offering list --catalog-id cat-001
+
+# Create an offering
+uv run tmf620 offering create --name "Premium Ethernet" --description "Managed enterprise access" --catalog-id cat-001
 ```
 
-### Option 3: Traditional Python
+## Start The MCP Server
+
+If you need MCP-native agent integration, run the server separately:
 
 ```bash
-pip install -r requirements.txt
-python tmf620_mcp_server.py
+uv run tmf620-mcp-server
 ```
 
-## Verify MCP Server is Running
+The MCP server will be available at `http://localhost:7701`, with health at `http://localhost:7701/health`.
 
-The MCP server will be available at: **http://localhost:7701**
-
-```bash
-# Test connection
-curl http://localhost:7701/health
-```
+This is a separate adapter. The CLI does not go through the MCP server.
 
 ## Configuration
 
-The MCP server reads from `config.json`:
+Both the CLI and MCP server read `config.json` by default:
 
 ```json
 {
@@ -61,38 +75,12 @@ The MCP server reads from `config.json`:
 }
 ```
 
-## Important Notes
+You can override the config path with `TMF620_CONFIG_PATH` or `tmf620 --config path/to/config.json ...`.
 
-⚠️ **The MCP server expects a TMF620 API to be running at the configured URL**
+## Notes
 
-- Default: `http://localhost:8801/tmf-api/productCatalogManagement/v4`
-- If you need the mock API too, start it separately: `uv run tmf620-mock-server`
-- Update `config.json` to point to your actual TMF620 API endpoint
-
-## Available MCP Tools
-
-Once running, the MCP server exposes these tools:
-
-- `list_catalogs` - List all product catalogs
-- `get_catalog` - Get specific catalog by ID
-- `list_product_offerings` - List product offerings
-- `get_product_offering` - Get specific product offering
-- `list_product_specifications` - List product specifications
-- `get_product_specification` - Get specific product specification
-- `create_product_offering` - Create new product offering
-- `create_product_specification` - Create new product specification
-- `health` - Check server health
-
-## Troubleshooting
-
-**Connection refused?**
-- Check if port 7701 is available
-- Verify config.json has correct settings
-
-**API connection errors?**
-- Ensure TMF620 API is running at configured URL
-- Check `tmf620_api.url` in config.json
-
-**Need the mock API too?**
-- Start both: `uv run tmf620-mock-server` + `uv run tmf620-mcp-server` (two terminals)
-- Or see `README.md` for complete setup
+- The CLI talks directly to the TMF620 API.
+- The CLI supports both `--help` and `tmf620 discover` for agent discovery.
+- The MCP server is now a thin adapter over the same shared client logic.
+- The MCP adapter in this repo exposes 9 tools.
+- If the API is not running at the configured URL, both the CLI and MCP server will fail.

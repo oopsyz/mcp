@@ -86,6 +86,21 @@ class ProductSpecification(BaseModel):
     lifecycleStatus: str
     productSpecCharacteristic: List[ProductSpecCharacteristic]
 
+
+class ProductOfferingCreateRequest(BaseModel):
+    name: str
+    description: str
+    catalogId: str
+    lifecycleStatus: str = "Active"
+    version: str = "1.0"
+
+
+class ProductSpecificationCreateRequest(BaseModel):
+    name: str
+    description: str
+    version: str = "1.0"
+    lifecycleStatus: str = "Active"
+
 # Sample data
 catalogs = [
     Catalog(
@@ -286,9 +301,15 @@ async def get_catalog(catalog_id: str):
     summary="List product offerings",
     description="Retrieves a list of all product offerings. Can be filtered by catalog ID using the catalog_id query parameter."
 )
-async def get_product_offerings(catalog_id: Optional[str] = Query(None, description="Filter offerings by catalog ID")):
-    if catalog_id:
-        return [po for po in product_offerings if po.catalogId == catalog_id]
+async def get_product_offerings(
+    catalog_id: Optional[str] = Query(None, description="Filter offerings by catalog ID"),
+    catalog_dot_id: Optional[str] = Query(
+        None, alias="catalog.id", description="Alternate filter name used by some clients"
+    ),
+):
+    catalog_filter = catalog_id or catalog_dot_id
+    if catalog_filter:
+        return [po for po in product_offerings if po.catalogId == catalog_filter]
     return product_offerings
 
 @app.get(
@@ -331,13 +352,84 @@ async def get_product_specification(spec_id: str):
     summary="Create new product offering",
     description="Creates a new product offering. If no ID is provided, one will be generated automatically."
 )
-async def create_product_offering(offering: ProductOffering):
-    if not offering.id:
-        offering.id = f"po-{str(uuid.uuid4())[:8]}"
-    if not offering.href:
-        offering.href = f"/tmf-api/productCatalogManagement/v4/productOffering/{offering.id}"
-    product_offerings.append(offering)
-    return offering
+async def create_product_offering(offering: ProductOfferingCreateRequest):
+    catalog = next((c for c in catalogs if c.id == offering.catalogId), None)
+    if not catalog:
+        raise HTTPException(status_code=404, detail="Catalog not found")
+
+    spec_id = f"ps-{str(uuid.uuid4())[:8]}"
+    specification = ProductSpecification(
+        id=spec_id,
+        href=f"/tmf-api/productCatalogManagement/v4/productSpecification/{spec_id}",
+        name=f"{offering.name} Specification",
+        description=f"Technical specification for {offering.name}",
+        version=offering.version,
+        validFor=ValidFor(
+            startDateTime=datetime.now(),
+            endDateTime=datetime.now() + timedelta(days=365),
+        ),
+        lifecycleStatus=offering.lifecycleStatus,
+        productSpecCharacteristic=[],
+    )
+    product_specifications.append(specification)
+
+    category_name = "Mobile Devices" if "iphone" in offering.name.lower() else "General"
+    offering_id = f"po-{str(uuid.uuid4())[:8]}"
+    created_offering = ProductOffering(
+        id=offering_id,
+        href=f"/tmf-api/productCatalogManagement/v4/productOffering/{offering_id}",
+        name=offering.name,
+        description=offering.description,
+        version=offering.version,
+        validFor=ValidFor(
+            startDateTime=datetime.now(),
+            endDateTime=datetime.now() + timedelta(days=365),
+        ),
+        lifecycleStatus=offering.lifecycleStatus,
+        isBundle=False,
+        isSellable=True,
+        catalogId=offering.catalogId,
+        category=[
+            Category(
+                id=f"category-{category_name.lower().replace(' ', '-')}",
+                href=f"/tmf-api/productCatalogManagement/v4/category/category-{category_name.lower().replace(' ', '-')}",
+                name=category_name,
+            )
+        ],
+        productSpecification=ProductSpecificationRef(
+            id=specification.id,
+            href=specification.href,
+            name=specification.name,
+        ),
+    )
+    product_offerings.append(created_offering)
+    return created_offering
+
+
+@app.post(
+    "/tmf-api/productCatalogManagement/v4/productSpecification",
+    response_model=ProductSpecification,
+    status_code=201,
+    summary="Create new product specification",
+    description="Creates a new product specification with generated ID and default validity period."
+)
+async def create_product_specification(specification: ProductSpecificationCreateRequest):
+    spec_id = f"ps-{str(uuid.uuid4())[:8]}"
+    created_specification = ProductSpecification(
+        id=spec_id,
+        href=f"/tmf-api/productCatalogManagement/v4/productSpecification/{spec_id}",
+        name=specification.name,
+        description=specification.description,
+        version=specification.version,
+        validFor=ValidFor(
+            startDateTime=datetime.now(),
+            endDateTime=datetime.now() + timedelta(days=365),
+        ),
+        lifecycleStatus=specification.lifecycleStatus,
+        productSpecCharacteristic=[],
+    )
+    product_specifications.append(created_specification)
+    return created_specification
 
 @app.get("/tmf-api/productCatalogManagement/v4/schema")
 async def get_schema():

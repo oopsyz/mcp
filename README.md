@@ -1,97 +1,100 @@
-# TMF620 MCP Server
+# TMF620 CLI + MCP Server
 
-(The last version was a quick prototype. Here's a cleaner implementation)
+TMF620 Product Catalog Management with three layers:
 
-A modern TMF620 Product Catalog Management system with MCP (Model Context Protocol) support for AI agents, built with Python and `uv` for fast, reliable dependency management.
+- a mock TMF620 API
+- a shared Python client
+- two adapters over that client: CLI and MCP
 
-## 🚀 Features
+This keeps the operational logic in one place while supporting both shell-first workflows and MCP-native AI agents.
 
-- **TMF620 Compliant**: Full implementation of TM Forum TMF620 Product Catalog Management API
-- **MCP Integration**: Native Model Context Protocol support for AI agents
-- **Modern Python**: Built with `uv` for fast dependency resolution and packaging
-- **Production Ready**: Docker support, proper configuration management, and deployment tools
-- **Developer Friendly**: Hot reload, comprehensive docs, and easy testing
+Request paths:
 
-## 🏗️ Architecture
+- CLI -> `tmf620_core.py` -> TMF620 API
+- MCP client -> `tmf620_mcp_server.py` -> `tmf620_core.py` -> TMF620 API
 
-The system consists of two main components:
+## Components
 
-### 1. **Mock TMF620 API** (`mock_tmf620_api_fastapi.py`)
-- FastAPI-based TMF620 compliant API server
-- Sample catalog data (catalogs, product offerings, specifications)
-- Built-in Swagger documentation and MCP integration
-- Configurable features (CORS, docs, MCP)
+### 1. Mock TMF620 API
 
-### 2. **MCP Server** (`tmf620_mcp_server.py`)
-- MCP protocol server for AI agent integration
-- Connects to TMF620 API (mock or real)
-- Provides structured tools for catalog management
-- Health monitoring and error handling
+File: `mock_tmf620_api_fastapi.py`
 
-## 🔄 Data Flow
+- FastAPI-based TMF620 mock server
+- sample catalogs, offerings, and specifications
+- Swagger docs and optional MCP exposure
 
-```
-AI Agent → MCP Server → TMF620 API → Catalog Data
-    ↑         ↓           ↓
-   Tools   HTTP Calls   JSON Response
-```
+### 2. Shared TMF620 Client
 
-## ⚡ Quick Start
+File: `tmf620_core.py`
 
-### Prerequisites
+- config loading
+- HTTP request handling
+- health checks
+- catalog, offering, and specification operations
 
-Install `uv` for fast dependency management:
+### 3. CLI Adapter
 
-```bash
-# macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
+File: `tmf620_cli.py`
 
-# Windows (PowerShell)
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+- direct shell interface for humans, scripts, CI, and CLI-native agents
+- exposed as the `tmf620` console script
+- talks directly to the configured TMF620 API URL
 
-# Or with pip
-pip install uv
-```
+### 4. MCP Adapter
 
-### Option 1: Using uv (Recommended)
+File: `tmf620_mcp_server.py`
+
+- FastAPI + `fastapi-mcp`
+- exposes the same operations as MCP tools for MCP-capable agents
+- delegates into `tmf620_core.py`
+
+## Quick Start
+
+### Install dependencies
 
 ```bash
-# Install dependencies
 uv sync
-
-# Start both services (two terminals)
-uv run tmf620-mock-server    # Terminal 1
-uv run tmf620-mcp-server     # Terminal 2
 ```
 
-### Option 2: Background Processes
+### Start the mock API
 
 ```bash
-# Windows
-start uv run tmf620-mock-server
-start uv run tmf620-mcp-server
-
-# Linux/Mac
-uv run tmf620-mock-server &
-uv run tmf620-mcp-server &
+uv run tmf620-mock-server
 ```
 
-### Option 3: Traditional Python
+Default API base URL:
+
+```text
+http://localhost:8801/tmf-api/productCatalogManagement/v4
+```
+
+### Use the CLI
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Start services manually
-python mock_tmf620_api_fastapi.py  # Terminal 1
-python tmf620_mcp_server.py        # Terminal 2
+uv run tmf620 health
+uv run tmf620 discover
+uv run tmf620 catalog list
+uv run tmf620 catalog get cat-001
+uv run tmf620 offering list --catalog-id cat-001
+uv run tmf620 specification list
 ```
 
-## 🔧 Configuration
+### Start the MCP server
 
-The system uses JSON configuration files:
+```bash
+uv run tmf620-mcp-server
+```
 
-### `config.json` - MCP Server & API Connection
+Default MCP server URL:
+
+```text
+http://localhost:7701
+```
+
+## Configuration
+
+`config.json` is used by both the CLI and MCP server:
+
 ```json
 {
   "mcp_server": {
@@ -105,40 +108,34 @@ The system uses JSON configuration files:
 }
 ```
 
-### `mock_server_config.json` - Mock Server Settings
-```json
-{
-  "server": {
-    "host": "localhost",
-    "port": 8801,
-    "protocol": "http"
-  },
-  "features": {
-    "enable_cors": true,
-    "enable_docs": true,
-    "enable_mcp": true
-  }
-}
+You can also override the config path with `TMF620_CONFIG_PATH`.
+
+## CLI Commands
+
+```bash
+# Health and config
+uv run tmf620 health
+uv run tmf620 config
+uv run tmf620 discover
+
+# Catalogs
+uv run tmf620 catalog list
+uv run tmf620 catalog get cat-001
+
+# Product offerings
+uv run tmf620 offering list --catalog-id cat-001
+uv run tmf620 offering get po-001
+uv run tmf620 offering create --name "Premium Ethernet" --description "Managed enterprise access" --catalog-id cat-001
+
+# Product specifications
+uv run tmf620 specification list
+uv run tmf620 specification get ps-001
+uv run tmf620 specification create --name "Broadband Gold" --description "Gold tier broadband spec" --version 2.0
 ```
 
-## 🌐 Available Services
+## MCP Usage
 
-### Mock TMF620 API (Port 8801)
-
-- **API Endpoints**: Full TMF620-compliant catalog management
-- **Swagger UI**: http://localhost:8801/docs
-- **ReDoc**: http://localhost:8801/redoc
-- **MCP Interface**: http://localhost:8801/mcp
-
-### MCP Server (Port 7701)
-
-- **MCP Tools**: Tools for AI agents to interact with the catalog
-- **Health Check**: Monitor server and API connection health
-- **Error Handling**: Comprehensive error handling and logging
-
-## 🤖 Using with Claude Desktop
-
-Add the following to your Claude Desktop configuration:
+Example Claude Desktop config:
 
 ```json
 {
@@ -152,179 +149,59 @@ Add the following to your Claude Desktop configuration:
 }
 ```
 
-Or using traditional Python:
+Available MCP tools:
 
-```json
-{
-  "mcpServers": {
-    "tmf620-mcp": {
-      "command": "python",
-      "args": ["tmf620_mcp_server.py"],
-      "cwd": "/path/to/tmf620-mcp-server"
-    }
-  }
-}
+- `list_catalogs`
+- `get_catalog`
+- `list_product_offerings`
+- `get_product_offering`
+- `create_product_offering`
+- `list_product_specifications`
+- `get_product_specification`
+- `create_product_specification`
+- `health`
+
+Tool count in this repo's MCP adapter: `9`
+
+The CLI is not routed through the MCP server. By default it talks directly to the mock API because `config.json` points `tmf620_api.url` at `http://localhost:8801/tmf-api/productCatalogManagement/v4`.
+
+## Agent Discovery
+
+For machine-readable CLI discovery, use:
+
+```bash
+uv run tmf620 discover
 ```
 
-## Available MCP Tools
+This returns the full command tree, arguments, and examples as JSON so an LLM or agent runtime does not need to scrape `--help` output.
 
-The MCP server provides these tools for AI agents:
-
-### Catalog Management
-- `list_catalogs`: List all product catalogs
-- `get_catalog`: Get a specific catalog by ID
-
-### Product Offering Management
-- `list_product_offerings`: List product offerings (optionally filtered by catalog)
-- `get_product_offering`: Get a specific product offering by ID
-- `create_product_offering`: Create a new product offering
-
-### Product Specification Management
-- `list_product_specifications`: List all product specifications
-- `get_product_specification`: Get a specific product specification by ID
-- `create_product_specification`: Create a new product specification
-
-### System Tools
-- `health`: Check server and API connection health
-
-## Example Usage
-
-### Using the Python Client
+## Python Helper Usage
 
 ```python
 from tmf620_client import get_catalogs, get_product_offerings
 
-# Get all catalogs
 catalogs = get_catalogs()
-for catalog in catalogs:
-    print(f"Catalog: {catalog['name']}")
-
-# Get offerings for a specific catalog
 offerings = get_product_offerings("cat-001")
-for offering in offerings:
-    print(f"Offering: {offering['name']}")
 ```
 
-### Using MCP Tools with AI Agents
-
-Once you have the MCP server configured with your AI agent, you can ask natural language questions and the AI will automatically use the appropriate tools:
-
-```
-"Show me all the product catalogs"
-→ AI calls tmf620.list_catalogs
-
-"Get details for catalog cat-001"  
-→ AI calls tmf620.get_catalog with catalog_id=cat-001
-
-"What product offerings are in the electronics catalog?"
-→ AI calls tmf620.list_product_offerings with catalog_id
-
-"Create a new premium service offering in catalog cat-001"
-→ AI calls tmf620.create_product_offering with appropriate parameters
-
-"Is the TMF620 system healthy?"
-→ AI calls tmf620.health
-```
-
-**Note**: The AI automatically selects and calls the right tools based on your requests. No special commands needed - just ask naturally! See the "Using with Claude Desktop" section above for MCP server setup instructions.
-
-## 🧪 Testing
-
-### Test the Mock API
+## Testing
 
 ```bash
-# Test with client script
-uv run tmf620_client.py
-
-# Or use curl with correct port
+# Mock API
 curl http://localhost:8801/tmf-api/productCatalogManagement/v4/catalog
-```
 
-### Test the MCP Server
+# CLI
+uv run tmf620 health
+uv run tmf620 catalog list
 
-```bash
-# Check health (note: correct port 7701)
+# MCP server
 curl http://localhost:7701/health
 ```
 
-## 🚀 Deployment
+## Packaging
 
-### Package for Distribution
+Console scripts exposed by `pyproject.toml`:
 
-```bash
-# Build wheel package
-uv build
-
-# Install from wheel
-uv pip install dist/tmf620_mcp_server-1.0.0-py3-none-any.whl
-```
-
-### Production Deployment
-
-```bash
-# Create production environment
-uv venv production
-source production/bin/activate  # Linux/Mac
-# or production\Scripts\activate  # Windows
-
-# Install production dependencies
-uv sync --frozen
-
-# Run with production server
-uv run uvicorn mock_tmf620_api_fastapi:app --host 0.0.0.0 --port 8801
-```
-
-### Docker Deployment
-
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY . .
-RUN pip install uv
-RUN uv sync --frozen
-EXPOSE 8801 7701
-CMD ["sh", "-c", "uv run tmf620-mock-server & uv run tmf620-mcp-server & wait"]
-```
-
-## 🛠️ Development
-
-### Install Development Dependencies
-
-```bash
-uv sync --group dev
-```
-
-### Code Quality
-
-```bash
-# Format code
-uv run black .
-
-# Lint code
-uv run ruff check .
-```
-
-### Adding New Endpoints
-
-1. **Add to Mock API**: Add new FastAPI routes in `mock_tmf620_api_fastapi.py`
-2. **Add to MCP Server**: Add corresponding tools in `tmf620_mcp_server.py`
-3. **Update Configuration**: Add endpoint definitions in `config.json`
-
-### Debugging
-
-- Check logs from both servers
-- Use the health check endpoint: `curl http://localhost:7701/health`
-- Test API endpoints directly: `curl http://localhost:8801/tmf-api/productCatalogManagement/v4/catalog`
-
-## 🏆 Architecture Benefits
-
-1. **Modern Tooling**: Uses `uv` for fast, reliable dependency management
-2. **Separation of Concerns**: Mock API and MCP server are cleanly separated
-3. **Configuration Management**: JSON-based configuration for easy environment management
-4. **Production Ready**: Docker support, proper packaging, and deployment tools
-5. **Developer Experience**: Hot reload, comprehensive docs, and easy testing
-6. **AI Integration**: Native MCP support for seamless AI agent interaction
-
-## 📄 License
-
-This project is licensed under the MIT License. 
+- `tmf620-mock-server`
+- `tmf620-mcp-server`
+- `tmf620`
