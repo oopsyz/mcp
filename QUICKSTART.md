@@ -4,6 +4,8 @@
 
 Use Docker if you want the mock API and MCP/HTTP CLI stack together in one containerized runtime.
 
+Once it is up, paste `http://localhost:7701/api/cli` into a Codex, Claude, or Cursor chat window and start talking to it.
+
 ```bash
 docker compose up --build
 ```
@@ -14,13 +16,15 @@ The container exposes:
 - MCP transport at `http://localhost:7701/mcp`
 - HTTP CLI API at `http://localhost:7701/api/cli`
 
-The container uses environment overrides rather than rewriting config files. Set them in `docker-compose.yml`, or use a `.env` file with Docker Compose:
+The container uses environment overrides rather than rewriting config files. Set them in `docker-compose.yml`, or use a `.env` file with Docker Compose
 
-- `TMF620_API_URL`
+![Quick start](quick_start.png)
 
 ## Without Docker
 
 Use this path for local development with `uv`.
+
+Once it is up, paste `http://localhost:7701/api/cli` into a Codex, Claude, or Cursor chat window and start talking to it.
 
 ### Prerequisites
 

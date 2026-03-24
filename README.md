@@ -2,6 +2,8 @@
 
 We are shifting the agent-facing interface toward the HTTP CLI API because it is materially cheaper to discover and easier to expand progressively than exposing the full MCP tool surface on every turn.
 
+Once the stack is running, paste the HTTP CLI API URL into a Codex, Claude, or Cursor chat window and start talking to it. The agent can discover commands through `/api/cli` and invoke them without a separate SDK.
+
 The practical reasons are:
 
 - compact discovery: agents can start with `GET /api/cli` instead of ingesting the full MCP tool list up front
@@ -93,6 +95,8 @@ The container exposes:
 The container uses environment overrides rather than rewriting config files. Set them in `docker-compose.yml`, or use a `.env` file with Docker Compose:
 
 - `TMF620_API_URL`
+
+![Quick start](quick_start.png)
 
 ## Without Docker
 
