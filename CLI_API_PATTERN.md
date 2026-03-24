@@ -11,6 +11,8 @@ POST /api/cli
 
 One endpoint. All tools. Discovery built in. No URL construction, no per-tool routes.
 
+Example: in the TMF620 repo, the MCP adapter exposes `38` generated command tools plus `2` compatibility tools. The measured wrapped MCP tool payload is `3,735` tokens, while compact `GET /api/cli` is `189` tokens, compact group help is `105` tokens, and compact catalog + group help + leaf help is `512` tokens. That gap is why the rest of this pattern prefers compact progressive discovery for larger surfaces.
+
 This pattern is well-suited for services with many tools because the LLM pays context cost proportional to what it actually uses — not the full tool surface upfront.
 
 ---
@@ -555,6 +557,8 @@ to discover available commands, then invoke them as needed.
 ---
 
 ### MCP — Claude Desktop and MCP-aware frameworks
+
+TMF620 is a concrete example of why this matters: the wrapped MCP tool payload is `3,735` tokens for `40` visible tools in the adapter, while the compact HTTP CLI path is `189` tokens for the initial catalog and `512` tokens through one leaf command. The exact numbers vary by schema size, but the shape of the tradeoff is stable: MCP discovery grows with the tool surface, while compact CLI discovery grows with only the branch the agent actually inspects.
 
 For MCP clients, expose a single `cli` tool that proxies to the same underlying command registry. The MCP client sees **one tool** instead of the full surface — the LLM drives discovery through `help` exactly as it would over HTTP.
 

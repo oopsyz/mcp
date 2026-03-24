@@ -1,6 +1,29 @@
 # TMF620 CLI + MCP Server
 
-We added the `TMF620` CLI to better support AI agents, especially in shell-first workflows where direct command execution is simpler than MCP integration alone.
+We are shifting the agent-facing interface toward the HTTP CLI API because it is materially cheaper to discover and easier to expand progressively than exposing the full MCP tool surface on every turn.
+
+The practical reasons are:
+
+- compact discovery: agents can start with `GET /api/cli` instead of ingesting the full MCP tool list up front
+- progressive help: agents can expand one command branch at a time with `help`
+- lower token cost: the benchmark in this repo shows the compact CLI path is much smaller than the wrapped MCP tool payload
+- simpler automation: `curl` works well for both humans and agents, especially when the command surface is already structured
+- one shared command layer: the same command definitions back the HTTP CLI API, the MCP adapter, and the benchmark
+
+The current benchmark numbers are:
+
+- MCP tool surface: `38` generated command tools, plus `2` compatibility tools in this repo's adapter
+- raw MCP discovery payload: `3,393` tokens
+- OpenAI-wrapped MCP tool payload: `3,735` tokens
+- compact `GET /api/cli`: `189` tokens
+- compact group help: `105` tokens
+- leaf help: `218` tokens
+- compact catalog + group help: `294` tokens
+- compact catalog + group help + leaf help: `512` tokens
+
+That matters because many agent runtimes resend the tool list on each model call or session turn. In that common pattern, a large MCP tool surface becomes repeated context cost. Compact CLI discovery avoids paying for every tool up front and instead expands only the branch the agent needs.
+
+This repo is not claiming a universal MCP tool-count limit. The point is more pragmatic: once you have a few dozen tools, full-tool discovery becomes expensive enough that progressive CLI discovery is easier to justify and easier to benchmark.
 
 TMF620 Product Catalog Management with three layers:
 
