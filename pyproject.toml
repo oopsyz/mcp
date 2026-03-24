@@ -26,7 +26,7 @@ dev = [
 [project.scripts]
 tmf620-mock-server = "mock_tmf620_api_fastapi:main"
 tmf620-mcp-server = "tmf620_mcp_server:main"
-tmf620 = "tmf620_cli:main"
+poc-linux-service = "poc_linux_service:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -36,10 +36,9 @@ build-backend = "hatchling.build"
 packages = ["."]
 include = [
     "tmf620_core.py",
-    "tmf620_cli.py",
+    "tmf620_commands.py",
     "tmf620_mcp_server.py",
-    "mock_tmf620_api_fastapi.py", 
-    "tmf620_client.py",
+    "mock_tmf620_api_fastapi.py",
     "config.json",
     "mock_server_config.json"
 ]

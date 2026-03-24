@@ -1,14 +1,17 @@
 import asyncio
 import datetime
+import json
 import logging
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_mcp import FastApiMCP
 from pydantic import BaseModel
+from starlette.responses import JSONResponse, StreamingResponse
 
+from tmf620_commands import get_catalog_payload, get_command_help_payload, invoke_command
 from tmf620_core import TMF620Client, TMF620Error, load_config
 
 
@@ -44,6 +47,12 @@ class ApiResponse(BaseModel):
     timestamp: Optional[str] = None
 
 
+class CliRequest(BaseModel):
+    command: str
+    args: dict[str, Any] = {}
+    stream: bool = False
+
+
 def _now() -> str:
     return datetime.datetime.now().isoformat()
 
@@ -61,6 +70,62 @@ def _safe_call(fn, *args):
     except TMF620Error as exc:
         logger.error("%s", exc)
         return ApiResponse(error=str(exc), timestamp=_now())
+
+
+def _json_error(status_code: int, code: str, message: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={"status": "error", "error": {"code": code, "message": message}},
+    )
+
+
+def _streaming_result_chunks(command: str, args: dict[str, Any], result: Any):
+    yield json.dumps(
+        {
+            "status": "ok",
+            "type": "started",
+            "command": command,
+            "args": args,
+            "timestamp": _now(),
+        }
+    ) + "\n"
+
+    if isinstance(result, list):
+        for item in result:
+            yield json.dumps({"status": "ok", "type": "item", "item": item}) + "\n"
+        yield json.dumps(
+            {
+                "status": "ok",
+                "type": "done",
+                "total": len(result),
+                "result_kind": "items",
+            }
+        ) + "\n"
+        return
+
+    if isinstance(result, dict) and isinstance(result.get("items"), list):
+        for item in result["items"]:
+            yield json.dumps({"status": "ok", "type": "item", "item": item}) + "\n"
+        metadata = {key: value for key, value in result.items() if key != "items"}
+        yield json.dumps(
+            {
+                "status": "ok",
+                "type": "done",
+                "total": len(result["items"]),
+                "result_kind": "items",
+                "metadata": metadata,
+            }
+        ) + "\n"
+        return
+
+    yield json.dumps({"status": "ok", "type": "result", "result": result}) + "\n"
+    yield json.dumps(
+        {
+            "status": "ok",
+            "type": "done",
+            "result_kind": "single",
+        }
+    ) + "\n"
 
 
 @asynccontextmanager
@@ -98,6 +163,78 @@ async def health_check():
     payload = _get_client().health()
     payload["timestamp"] = _now()
     return payload
+
+
+@app.get("/api/cli", operation_id="cli_catalog")
+async def cli_catalog():
+    return get_catalog_payload()
+
+
+@app.post("/api/cli", operation_id="cli_dispatch")
+async def cli_dispatch(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        return _json_error(400, "invalid_json", "Request body must be valid JSON.")
+
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_request", "Request body must be a JSON object.")
+
+    command = payload.get("command")
+    if not isinstance(command, str) or not command.strip():
+        return _json_error(400, "invalid_command", "Command must be a non-empty string.")
+
+    args = payload.get("args", {})
+    if not isinstance(args, dict):
+        return _json_error(400, "invalid_arguments", "args must be a JSON object.")
+
+    stream = bool(payload.get("stream", False))
+    normalized_command = command.strip()
+
+    if normalized_command == "help":
+        target = args.get("command")
+        if target is None:
+            return get_catalog_payload()
+        if not isinstance(target, str) or not target.strip():
+            return _json_error(400, "invalid_arguments", "help args.command must be a non-empty string.")
+        help_payload = get_command_help_payload(target.strip())
+        if help_payload is None:
+            return _json_error(404, "command_not_found", f"Unknown command: {target}")
+        return help_payload
+
+    try:
+        result = await asyncio.to_thread(
+            invoke_command,
+            normalized_command,
+            args,
+            config_path=None,
+            output="json",
+        )
+    except TMF620Error as exc:
+        message = str(exc)
+        status_code = 404 if message.startswith("Unknown command path:") else 500
+        code = "command_not_found" if status_code == 404 else "tool_invocation_failed"
+        return _json_error(status_code, code, message)
+    except TypeError as exc:
+        return _json_error(400, "invalid_arguments", str(exc))
+    except Exception as exc:
+        logger.exception("Unexpected CLI API failure")
+        return _json_error(500, "tool_invocation_failed", str(exc))
+
+    if stream:
+        return StreamingResponse(
+            _streaming_result_chunks(normalized_command, args, result),
+            media_type="application/x-ndjson",
+        )
+
+    return {
+        "status": "ok",
+        "service": "tmf620",
+        "interface": "cli-http",
+        "command": normalized_command,
+        "args": args,
+        "result": result,
+    }
 
 
 @app.get("/catalogs", operation_id="list_catalogs")

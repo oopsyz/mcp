@@ -6,13 +6,13 @@ TMF620 Product Catalog Management with three layers:
 
 - a mock TMF620 API
 - a shared Python client
-- two adapters over that client: CLI and MCP
+- two adapters over that client: HTTP CLI API and MCP
 
-This keeps the operational logic in one place while supporting both shell-first workflows and MCP-native AI agents.
+This keeps the operational logic in one place while supporting HTTP and MCP adapters over the same TMF620 command set.
 
 Request paths:
 
-- CLI -> `tmf620_core.py` -> TMF620 API
+- HTTP CLI API -> `tmf620_mcp_server.py` -> `tmf620_commands.py` -> `tmf620_core.py` -> TMF620 API
 - MCP client -> `tmf620_mcp_server.py` -> `tmf620_core.py` -> TMF620 API
 
 ## Components
@@ -32,23 +32,26 @@ File: `tmf620_core.py`
 - config loading
 - HTTP request handling
 - health checks
-- catalog, offering, and specification operations
+- generic CRUD helpers for TMF620 resources
+- catalog, category, offering, price, specification, import/export job, and hub operations
 
-### 3. CLI Adapter
+### 3. Shared Command Layer
 
-File: `tmf620_cli.py`
+File: `tmf620_commands.py`
 
-- direct shell interface for humans, scripts, CI, and CLI-native agents
-- exposed as the `tmf620` console script
-- talks directly to the configured TMF620 API URL
+- canonical TMF620 command registry
+- machine-readable discover/help payloads
+- structured command invocation shared by shell and HTTP adapters
 
-### 4. MCP Adapter
+### 4. MCP + HTTP CLI Adapter
 
 File: `tmf620_mcp_server.py`
 
 - FastAPI + `fastapi-mcp`
+- exposes `/api/cli` for the HTTP CLI API pattern
 - exposes the same operations as MCP tools for MCP-capable agents
-- delegates into `tmf620_core.py`
+- delegates HTTP CLI requests into `tmf620_commands.py`
+- delegates MCP tools into `tmf620_core.py`
 
 ## Quick Start
 
@@ -67,18 +70,22 @@ uv run tmf620-mock-server
 Default API base URL:
 
 ```text
-http://localhost:8801/tmf-api/productCatalogManagement/v4
+http://localhost:8801/tmf-api/productCatalogManagement/v5
 ```
 
-### Use the CLI
+### Use the HTTP CLI API
 
 ```bash
-uv run tmf620 health
-uv run tmf620 discover
-uv run tmf620 catalog list
-uv run tmf620 catalog get cat-001
-uv run tmf620 offering list --catalog-id cat-001
-uv run tmf620 specification list
+curl http://localhost:7701/api/cli
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"help","args":{"command":"catalog list"}}'
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"catalog list","args":{"lifecycle_status":"Active","limit":5}}'
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"catalog get","args":{"catalog_id":"cat-001"}}'
 ```
 
 ### Start the MCP server
@@ -93,9 +100,16 @@ Default MCP server URL:
 http://localhost:7701
 ```
 
+HTTP CLI API endpoints:
+
+```text
+GET  http://localhost:7701/api/cli
+POST http://localhost:7701/api/cli
+```
+
 ## Configuration
 
-`config.json` is used by both the CLI and MCP server:
+`config.json` is used by both the HTTP CLI API and MCP server:
 
 ```json
 {
@@ -105,34 +119,54 @@ http://localhost:7701
     "name": "TMF620 Product Catalog API"
   },
   "tmf620_api": {
-    "url": "http://localhost:8801/tmf-api/productCatalogManagement/v4"
+    "url": "http://localhost:8801/tmf-api/productCatalogManagement/v5"
   }
 }
 ```
 
 You can also override the config path with `TMF620_CONFIG_PATH`.
 
-## CLI Commands
+## HTTP CLI Commands
 
 ```bash
-# Health and config
-uv run tmf620 health
-uv run tmf620 config
-uv run tmf620 discover
+# Discovery
+curl http://localhost:7701/api/cli
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"help","args":{"command":"offering patch"}}'
 
-# Catalogs
-uv run tmf620 catalog list
-uv run tmf620 catalog get cat-001
+# Read/list commands
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"category list","args":{"limit":5}}'
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"catalog list","args":{"lifecycle_status":"Active","limit":5}}'
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"offering list","args":{"catalog_id":"cat-001","limit":10,"offset":5}}'
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"price get","args":{"price_id":"pop-001"}}'
 
-# Product offerings
-uv run tmf620 offering list --catalog-id cat-001
-uv run tmf620 offering get po-001
-uv run tmf620 offering create --name "Premium Ethernet" --description "Managed enterprise access" --catalog-id cat-001
+# Create/patch commands use JSON bodies because TMF620 resource payloads are wide
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"catalog create","args":{"body":{"name":"Business Catalog","lifecycleStatus":"Active"}}}'
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"offering patch","args":{"offering_id":"po-001","body":{"description":"Updated description"}}}'
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"hub create","args":{"body":{"callback":"https://example.com/hooks/tmf620","query":"eventType=ProductOfferingCreateEvent"}}}'
 
-# Product specifications
-uv run tmf620 specification list
-uv run tmf620 specification get ps-001
-uv run tmf620 specification create --name "Broadband Gold" --description "Gold tier broadband spec" --version 2.0
+# Delete commands
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"category delete","args":{"category_id":"category-001"}}'
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"hub delete","args":{"hub_id":"hub-001"}}'
 ```
 
 ## MCP Usage
@@ -165,36 +199,78 @@ Available MCP tools:
 
 Tool count in this repo's MCP adapter: `9`
 
-The CLI is not routed through the MCP server. By default it talks directly to the mock API because `config.json` points `tmf620_api.url` at `http://localhost:8801/tmf-api/productCatalogManagement/v4`.
+The HTTP CLI API is routed through the MCP server. It uses the same `config.json` and shared command layer as the rest of the repo.
 
 ## Agent Discovery
 
-For machine-readable CLI discovery, use:
+For machine-readable discovery, use:
 
 ```bash
-uv run tmf620 discover
+curl http://localhost:7701/api/cli
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"help","args":{"command":"offering patch"}}'
 ```
 
-This returns the full command tree, arguments, and examples as JSON so an LLM or agent runtime does not need to scrape `--help` output.
+This returns the command catalog, or one command's detailed schema, as JSON so an LLM or agent runtime does not need to scrape human help output.
 
-## Python Helper Usage
+## HTTP CLI API
+
+The repo also exposes the CLI-style HTTP API pattern described in `CLI_API_PATTERN.md`.
+
+For agents, this is the canonical machine-facing command surface.
+
+Discovery:
+
+```bash
+curl http://localhost:7701/api/cli
+```
+
+Per-command help:
+
+```bash
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"help","args":{"command":"catalog list"}}'
+```
+
+Invoke:
+
+```bash
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"catalog list","args":{"limit":1}}'
+```
+
+Stream:
+
+```bash
+curl -N -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"catalog list","args":{"limit":1},"stream":true}'
+```
+
+## Python Usage
 
 ```python
-from tmf620_client import get_catalogs, get_product_offerings
+from tmf620_core import TMF620Client
 
-catalogs = get_catalogs()
-offerings = get_product_offerings("cat-001")
+client = TMF620Client()
+catalogs = client.list_catalogs(limit=5)
+offerings = client.list_product_offerings(catalog_id="cat-001", limit=10)
 ```
+
+Import `TMF620Client` from `tmf620_core.py` directly for Python usage.
 
 ## Testing
 
 ```bash
 # Mock API
-curl http://localhost:8801/tmf-api/productCatalogManagement/v4/catalog
+curl http://localhost:8801/tmf-api/productCatalogManagement/v5/productCatalog
 
-# CLI
-uv run tmf620 health
-uv run tmf620 catalog list
+# HTTP CLI API
+curl http://localhost:7701/api/cli
+curl -X POST http://localhost:7701/api/cli -H "Content-Type: application/json" -d '{"command":"catalog list","args":{}}'
 
 # MCP server
 curl http://localhost:7701/health

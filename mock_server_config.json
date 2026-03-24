@@ -8,7 +8,7 @@
     "description": "Mock implementation of TMF620 Product Catalog Management API"
   },
   "api": {
-    "base_path": "/tmf-api/productCatalogManagement/v4",
+    "base_path": "/tmf-api/productCatalogManagement/v5",
     "version": "4.0.0",
     "title": "TMF620 Product Catalog Management"
   },

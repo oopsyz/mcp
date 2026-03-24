@@ -20,30 +20,47 @@ uv sync
 uv run tmf620-mock-server
 ```
 
-The default TMF620 API base URL is `http://localhost:8801/tmf-api/productCatalogManagement/v4`.
+The default TMF620 API base URL is `http://localhost:8801/tmf-api/productCatalogManagement/v5`.
 
-## Use The CLI
+The MCP server also exposes the HTTP CLI API pattern at `http://localhost:7701/api/cli`.
 
-The CLI talks directly to the configured TMF620 API URL. With the default `config.json`, that means it talks directly to the mock server running on port `8801`.
+## Use The HTTP CLI API
+
+The HTTP CLI API is the command interface for agents and scripts. With the default `config.json`, it talks to the mock server running on port `8801`.
 
 ```bash
-# Check API health
-uv run tmf620 health
-
 # Discover command surface as JSON
-uv run tmf620 discover
+curl -s http://localhost:7701/api/cli
+
+# Get per-command help
+curl -s -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"help","args":{"command":"catalog list"}}'
+
+# Check API health
+curl -s -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"health","args":{}}'
 
 # List catalogs
-uv run tmf620 catalog list
+curl -s -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"catalog list","args":{}}'
 
 # Get one catalog
-uv run tmf620 catalog get cat-001
+curl -s -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"catalog get","args":{"catalog_id":"cat-001"}}'
 
 # List offerings for a catalog
-uv run tmf620 offering list --catalog-id cat-001
+curl -s -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"offering list","args":{"catalog_id":"cat-001"}}'
 
 # Create an offering
-uv run tmf620 offering create --name "Premium Ethernet" --description "Managed enterprise access" --catalog-id cat-001
+curl -s -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"offering create","args":{"body":{"name":"Premium Ethernet","description":"Managed enterprise access","lifecycleStatus":"Active","productOfferingPrice":[{"id":"pop-001","href":"http://localhost:8801/tmf-api/productCatalogManagement/v5/productOfferingPrice/pop-001","name":"Monthly fee","priceType":"recurring","price":{"taxIncludedAmount":{"unit":"USD","value":99.0}}}],"productCatalog":{"id":"cat-001"}}}}'
 ```
 
 ## Start The MCP Server
@@ -56,11 +73,11 @@ uv run tmf620-mcp-server
 
 The MCP server will be available at `http://localhost:7701`, with health at `http://localhost:7701/health`.
 
-This is a separate adapter. The CLI does not go through the MCP server.
+This is a separate adapter from the mock API. The HTTP CLI API and MCP tools both go through this server.
 
 ## Configuration
 
-Both the CLI and MCP server read `config.json` by default:
+Both the HTTP CLI API and MCP server read `config.json` by default:
 
 ```json
 {
@@ -70,17 +87,17 @@ Both the CLI and MCP server read `config.json` by default:
     "name": "TMF620 Product Catalog API"
   },
   "tmf620_api": {
-    "url": "http://localhost:8801/tmf-api/productCatalogManagement/v4"
+    "url": "http://localhost:8801/tmf-api/productCatalogManagement/v5"
   }
 }
 ```
 
-You can override the config path with `TMF620_CONFIG_PATH` or `tmf620 --config path/to/config.json ...`.
+You can override the config path with `TMF620_CONFIG_PATH`.
 
 ## Notes
 
-- The CLI talks directly to the TMF620 API.
-- The CLI supports both `--help` and `tmf620 discover` for agent discovery.
+- Use `GET /api/cli` for discovery and `POST /api/cli` for help and invocation.
 - The MCP server is now a thin adapter over the same shared client logic.
+- The shared command registry lives in `tmf620_commands.py`.
 - The MCP adapter in this repo exposes 9 tools.
-- If the API is not running at the configured URL, both the CLI and MCP server will fail.
+- If the API is not running at the configured URL, both the HTTP CLI API and MCP server will fail.
