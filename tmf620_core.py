@@ -75,19 +75,25 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
         logger.info("Falling back to environment variables")
 
     tmf620_api = config.setdefault("tmf620_api", {})
-    tmf620_api["url"] = tmf620_api.get("url") or os.environ.get(
-        "TMF620_API_URL", DEFAULT_API_URL
+    tmf620_api["url"] = os.environ.get(
+        "TMF620_API_URL",
+        tmf620_api.get("url") or DEFAULT_API_URL,
     )
 
     mcp_server = config.setdefault("mcp_server", {})
-    mcp_server["host"] = mcp_server.get("host") or os.environ.get(
-        "MCP_HOST", DEFAULT_MCP_HOST
+    mcp_server["host"] = os.environ.get(
+        "MCP_HOST",
+        mcp_server.get("host") or DEFAULT_MCP_HOST,
     )
-    mcp_server["port"] = mcp_server.get("port") or int(
-        os.environ.get("MCP_PORT", str(DEFAULT_MCP_PORT))
+    mcp_server["port"] = int(
+        os.environ.get(
+            "MCP_PORT",
+            str(mcp_server.get("port") or DEFAULT_MCP_PORT),
+        )
     )
-    mcp_server["name"] = mcp_server.get("name") or os.environ.get(
-        "MCP_NAME", DEFAULT_MCP_NAME
+    mcp_server["name"] = os.environ.get(
+        "MCP_NAME",
+        mcp_server.get("name") or DEFAULT_MCP_NAME,
     )
 
     config["endpoints"] = {**DEFAULT_ENDPOINTS, **config.get("endpoints", {})}

@@ -12,7 +12,16 @@ from pydantic import BaseModel, ConfigDict, Field
 def load_mock_config() -> dict[str, Any]:
     config_path = os.path.join(os.path.dirname(__file__), "mock_server_config.json")
     with open(config_path, encoding="utf-8") as f:
-        return json.load(f)
+        config = json.load(f)
+
+    server = config.setdefault("server", {})
+    server["host"] = os.environ.get("MOCK_HOST", server.get("host", "localhost"))
+    server["port"] = int(os.environ.get("MOCK_PORT", str(server.get("port", 8801))))
+    server["protocol"] = os.environ.get(
+        "MOCK_PROTOCOL",
+        server.get("protocol", "http"),
+    )
+    return config
 
 
 mock_config = load_mock_config()

@@ -1,8 +1,8 @@
-# Agent Guidance
+# Claude Guidance
 
 ## Preferred Interface
 
-For TMF620 command discovery and invocation, use the bash tool with `curl` against the HTTP CLI API. This is the preferred interface for Codex agents.
+For TMF620 command discovery and invocation, use the bash tool with `curl` against the HTTP CLI API. This is the preferred interface for Claude agents.
 
 - Discovery: `GET http://localhost:7701/api/cli`
 - Per-command help: `POST http://localhost:7701/api/cli` with `{"command":"help","args":{"command":"<command path>"}}`
