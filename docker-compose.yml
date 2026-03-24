@@ -8,10 +8,7 @@ services:
       - "8801:8801" # Mock API
     environment:
       - TMF620_API_URL=http://localhost:8801/tmf-api/productCatalogManagement/v5
-      - MCP_HOST=0.0.0.0
       - MCP_PORT=7701
-      - MOCK_HOST=0.0.0.0
-      - MOCK_PORT=8801
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7701/health"]
       interval: 30s

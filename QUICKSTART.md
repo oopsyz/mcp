@@ -1,6 +1,28 @@
 # TMF620 Quick Start
 
-## Prerequisites
+## Docker
+
+Use Docker if you want the mock API and MCP/HTTP CLI stack together in one containerized runtime.
+
+```bash
+docker compose up --build
+```
+
+The container exposes:
+
+- mock API at `http://localhost:8801/tmf-api/productCatalogManagement/v5`
+- MCP transport at `http://localhost:7701/mcp`
+- HTTP CLI API at `http://localhost:7701/api/cli`
+
+The container uses environment overrides rather than rewriting config files. Set them in `docker-compose.yml`, or use a `.env` file with Docker Compose:
+
+- `TMF620_API_URL`
+
+## Without Docker
+
+Use this path for local development with `uv`.
+
+### Prerequisites
 
 Install `uv` or ensure Python 3.10+ is available:
 
@@ -13,7 +35,7 @@ pip install uv
 
 `uv` will create a local `.venv/` automatically when you run `uv sync`.
 
-## Start The Mock API
+### Start The Mock API
 
 ```bash
 uv sync
@@ -24,7 +46,7 @@ The default TMF620 API base URL is `http://localhost:8801/tmf-api/productCatalog
 
 The MCP server also exposes the HTTP CLI API pattern at `http://localhost:7701/api/cli`.
 
-## Use The HTTP CLI API
+### Use The HTTP CLI API
 
 The HTTP CLI API is the command interface for agents and scripts. With the default `config.json`, it talks to the mock server running on port `8801`.
 
@@ -71,7 +93,7 @@ curl -s -X POST http://localhost:7701/api/cli \
   -d '{"command":"offering create","args":{"body":{"name":"Premium Ethernet","description":"Managed enterprise access","lifecycleStatus":"Active","productOfferingPrice":[{"id":"pop-001","href":"http://localhost:8801/tmf-api/productCatalogManagement/v5/productOfferingPrice/pop-001","name":"Monthly fee","priceType":"recurring","price":{"taxIncludedAmount":{"unit":"USD","value":99.0}}}],"productCatalog":{"id":"cat-001"}}}}'
 ```
 
-## Start The MCP Server
+### Start The MCP Server
 
 If you need MCP-native agent integration, run the server separately:
 
@@ -79,13 +101,13 @@ If you need MCP-native agent integration, run the server separately:
 uv run tmf620-mcp-server
 ```
 
-The MCP server will be available at `http://localhost:7701`, with health at `http://localhost:7701/health`.
+The MCP server will be available at `http://localhost:7701`, with MCP transport at `http://localhost:7701/mcp` and health at `http://localhost:7701/health`.
 
 This is a separate adapter from the mock API. The HTTP CLI API and MCP tools both go through this server.
 
 ## Configuration
 
-Both the HTTP CLI API and MCP server read `config.json` by default:
+Both the HTTP CLI API and MCP server read `config.json` by default, then apply `TMF620_API_URL` from Compose or the container environment:
 
 ```json
 {

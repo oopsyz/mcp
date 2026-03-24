@@ -76,7 +76,27 @@ File: `tmf620_mcp_server.py`
 - delegates HTTP CLI requests into `tmf620_commands.py`
 - delegates MCP tools into `tmf620_core.py`
 
-## Quick Start
+## Docker
+
+Use Docker if you want the mock API and MCP/HTTP CLI stack together in one containerized runtime.
+
+```bash
+docker compose up --build
+```
+
+The container exposes:
+
+- mock API at `http://localhost:8801/tmf-api/productCatalogManagement/v5`
+- MCP transport at `http://localhost:7701/mcp`
+- HTTP CLI API at `http://localhost:7701/api/cli`
+
+The container uses environment overrides rather than rewriting config files. Set them in `docker-compose.yml`, or use a `.env` file with Docker Compose:
+
+- `TMF620_API_URL`
+
+## Without Docker
+
+Use this path for local development with `uv`.
 
 ### Install dependencies
 
@@ -147,6 +167,10 @@ POST http://localhost:7701/api/cli
   }
 }
 ```
+
+Environment variables override file values at runtime:
+
+- `TMF620_API_URL`
 
 You can also override the config path with `TMF620_CONFIG_PATH`.
 

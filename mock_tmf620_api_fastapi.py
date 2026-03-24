@@ -14,13 +14,6 @@ def load_mock_config() -> dict[str, Any]:
     with open(config_path, encoding="utf-8") as f:
         config = json.load(f)
 
-    server = config.setdefault("server", {})
-    server["host"] = os.environ.get("MOCK_HOST", server.get("host", "localhost"))
-    server["port"] = int(os.environ.get("MOCK_PORT", str(server.get("port", 8801))))
-    server["protocol"] = os.environ.get(
-        "MOCK_PROTOCOL",
-        server.get("protocol", "http"),
-    )
     return config
 
 
