@@ -28,6 +28,10 @@ All tools are reachable through one URL. The LLM constructs `{"command": "...", 
 
 The LLM fetches detail on demand, not all at once.
 
+Compact-by-default catalogs are preferable for large services. If you want a richer top-level catalog for debugging or manual inspection, expose it behind an explicit switch such as `GET /api/cli?verbose=true` instead of making every caller pay that cost by default. The same principle applies to branch help: group nodes can stay compact, while leaf-command help expands to the full argument schema.
+
+If you want to validate the tradeoff in a real implementation, build a small benchmark that tokenizes the compact catalog, compact group help, leaf help, and the wrapped MCP tool payload. That makes the savings visible instead of theoretical.
+
 **3. Help is a first-class command**
 `help` is a reserved command name. The LLM can always ask what's available and how to use it — no out-of-band documentation needed.
 
@@ -237,6 +241,7 @@ def _catalog_payload() -> dict:
         "total": len(commands),
     }
 
+For larger command sets, keep this catalog payload compact by default. If you also want a richer catalog, expose it through an explicit `verbose=true` switch or a separate helper rather than expanding the default discovery response.
 
 def _command_help_payload(command_name: str) -> dict | None:
     registry = _cli_command_registry()

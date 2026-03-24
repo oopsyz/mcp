@@ -77,6 +77,7 @@ http://localhost:8801/tmf-api/productCatalogManagement/v5
 
 ```bash
 curl http://localhost:7701/api/cli
+curl "http://localhost:7701/api/cli?verbose=true"
 curl -X POST http://localhost:7701/api/cli \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"catalog list"}}'
@@ -131,6 +132,7 @@ You can also override the config path with `TMF620_CONFIG_PATH`.
 ```bash
 # Discovery
 curl http://localhost:7701/api/cli
+curl "http://localhost:7701/api/cli?verbose=true"
 curl -X POST http://localhost:7701/api/cli \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"offering patch"}}'
@@ -187,17 +189,10 @@ Example Claude Desktop config:
 
 Available MCP tools:
 
-- `list_catalogs`
-- `get_catalog`
-- `list_product_offerings`
-- `get_product_offering`
-- `create_product_offering`
-- `list_product_specifications`
-- `get_product_specification`
-- `create_product_specification`
-- `health`
+- Generated command tools under `/commands/...`, including `tmf620_health`, `tmf620_config`, `tmf620_discover`, and one tool per leaf command in `tmf620_commands.py`.
+- Compatibility tools remain for `health` and `server-config`.
 
-Tool count in this repo's MCP adapter: `9`
+Tool count in this repo's MCP adapter: `40` total, with `38` generated command tools plus `2` compatibility tools.
 
 The HTTP CLI API is routed through the MCP server. It uses the same `config.json` and shared command layer as the rest of the repo.
 
@@ -207,12 +202,14 @@ For machine-readable discovery, use:
 
 ```bash
 curl http://localhost:7701/api/cli
+curl "http://localhost:7701/api/cli?verbose=true"
 curl -X POST http://localhost:7701/api/cli \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"offering patch"}}'
 ```
 
-This returns the command catalog, or one command's detailed schema, as JSON so an LLM or agent runtime does not need to scrape human help output.
+`GET /api/cli` now returns the compact catalog by default. Use `verbose=true` only when you actually need the richer top-level payload. Per-command help remains the preferred way to expand one branch at a time.
+Group-level help is also compact by default. Leaf-command help returns the detailed argument schema.
 
 ## HTTP CLI API
 
@@ -226,12 +223,37 @@ Discovery:
 curl http://localhost:7701/api/cli
 ```
 
+Verbose discovery:
+
+```bash
+curl "http://localhost:7701/api/cli?verbose=true"
+```
+
 Per-command help:
 
 ```bash
 curl -X POST http://localhost:7701/api/cli \
   -H "Content-Type: application/json" \
+  -d '{"command":"help","args":{"command":"offering"}}'
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"catalog list"}}'
+```
+
+Verbose catalog via `help`:
+
+```bash
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"help","args":{"verbose":true}}'
+```
+
+Verbose group help:
+
+```bash
+curl -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"help","args":{"command":"offering","verbose":true}}'
 ```
 
 Invoke:
@@ -276,10 +298,28 @@ curl -X POST http://localhost:7701/api/cli -H "Content-Type: application/json" -
 curl http://localhost:7701/health
 ```
 
+## Token Benchmark
+
+Use the built-in benchmark to compare the compact HTTP CLI discovery flow against the MCP tool payload exposed by this repo:
+
+```bash
+uv run tmf620-token-benchmark
+uv run tmf620-token-benchmark --output json
+```
+
+The benchmark does not require the mock API or MCP server to be running. It measures the live local code:
+
+- compact `GET /api/cli` catalog
+- compact group help and leaf help from `tmf620_commands.py`
+- raw MCP tool objects from `fastapi-mcp`
+- OpenAI-style wrapped MCP tool payloads of the form `{"type":"function","function":{...}}`
+
+This makes it easy to reproduce the context-size comparison locally after future changes.
+
 ## Packaging
 
 Console scripts exposed by `pyproject.toml`:
 
 - `tmf620-mock-server`
 - `tmf620-mcp-server`
-- `tmf620`
+- `tmf620-token-benchmark`

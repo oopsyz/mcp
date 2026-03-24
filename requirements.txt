@@ -4,3 +4,4 @@ pydantic>=2.0.0
 requests>=2.31.0
 mcp>=1.0.0
 fastapi-mcp>=0.1.0
+tiktoken>=0.12.0

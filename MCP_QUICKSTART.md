@@ -32,7 +32,15 @@ The HTTP CLI API is the command interface for agents and scripts. With the defau
 # Discover command surface as JSON
 curl -s http://localhost:7701/api/cli
 
+# Request the richer catalog only when needed
+curl -s "http://localhost:7701/api/cli?verbose=true"
+
 # Get per-command help
+curl -s -X POST http://localhost:7701/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"help","args":{"command":"offering"}}'
+
+# Leaf help expands to the detailed argument schema
 curl -s -X POST http://localhost:7701/api/cli \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"catalog list"}}'
@@ -96,8 +104,8 @@ You can override the config path with `TMF620_CONFIG_PATH`.
 
 ## Notes
 
-- Use `GET /api/cli` for discovery and `POST /api/cli` for help and invocation.
+- Use compact `GET /api/cli` for discovery, `GET /api/cli?verbose=true` only when you need the richer catalog, compact group help for branch selection, and detailed leaf help only when you are ready to invoke.
 - The MCP server is now a thin adapter over the same shared client logic.
 - The shared command registry lives in `tmf620_commands.py`.
-- The MCP adapter in this repo exposes 9 tools.
+- The MCP adapter in this repo exposes 40 tools: 38 generated command routes plus 2 compatibility tools.
 - If the API is not running at the configured URL, both the HTTP CLI API and MCP server will fail.

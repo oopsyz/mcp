@@ -638,7 +638,30 @@ def _parser_schema(parser: argparse.ArgumentParser) -> dict[str, Any]:
     return schema
 
 
-def _catalog_payload(parser: argparse.ArgumentParser) -> dict[str, Any]:
+def _compact_catalog_payload() -> dict[str, Any]:
+    commands: dict[str, Any] = {}
+    for node in COMMAND_TREE:
+        if node["kind"] == "command":
+            commands[node["name"]] = node["help"]
+            continue
+        commands[node["name"]] = [child["name"] for child in node["commands"]]
+
+    return {
+        "status": "ok",
+        "service": "tmf620",
+        "interface": "commands",
+        "mode": "compact",
+        "usage": {
+            "catalog": "GET /api/cli",
+            "command_help": 'POST /api/cli {"command":"help","args":{"command":"<command path>"}}',
+            "invoke": 'POST /api/cli {"command":"<command path>","args":{...}}',
+        },
+        "global_options": ["config", "output"],
+        "commands": commands,
+    }
+
+
+def _verbose_catalog_payload(parser: argparse.ArgumentParser) -> dict[str, Any]:
     commands: list[dict[str, Any]] = []
     for node in COMMAND_TREE:
         entry = {
@@ -673,9 +696,65 @@ def _catalog_payload(parser: argparse.ArgumentParser) -> dict[str, Any]:
     }
 
 
+def _catalog_payload(
+    parser: argparse.ArgumentParser, *, verbose: bool = False
+) -> dict[str, Any]:
+    if verbose:
+        return _verbose_catalog_payload(parser)
+    return _compact_catalog_payload()
+
+
 def _command_payload(
-    parser: argparse.ArgumentParser, path: list[str]
+    parser: argparse.ArgumentParser, path: list[str], *, verbose: bool = False
 ) -> dict[str, Any] | None:
+    node = _find_command_node(path)
+    if node is not None:
+        schema = _parser_schema(parser)
+        current = schema
+
+        for token in path:
+            current = current["subcommands"].get(token)
+            if current is None:
+                return None
+
+        return {
+            "status": "ok",
+            "service": "tmf620",
+            "interface": "commands",
+            "mode": "detailed",
+            "command": " ".join(path),
+            "schema": current,
+        }
+
+    if not verbose:
+        current_nodes = COMMAND_TREE
+        current_group: dict[str, Any] | None = None
+        for token in path:
+            current_group = next(
+                (candidate for candidate in current_nodes if candidate["name"] == token),
+                None,
+            )
+            if current_group is None:
+                return None
+            current_nodes = current_group.get("commands", [])
+
+        if current_group is None or current_group["kind"] != "group":
+            return None
+
+        return {
+            "status": "ok",
+            "service": "tmf620",
+            "interface": "commands",
+            "mode": "compact",
+            "command": " ".join(path),
+            "summary": current_group["help"],
+            "description": current_group["description"],
+            "subcommands": [
+                {"name": child["name"], "summary": child["help"]}
+                for child in current_group["commands"]
+            ],
+        }
+
     schema = _parser_schema(parser)
     current = schema
 
@@ -688,20 +767,21 @@ def _command_payload(
         "status": "ok",
         "service": "tmf620",
         "interface": "commands",
+        "mode": "detailed",
         "command": " ".join(path),
         "schema": current,
     }
 
 
-def get_catalog_payload() -> dict[str, Any]:
-    return _catalog_payload(build_parser())
+def get_catalog_payload(*, verbose: bool = False) -> dict[str, Any]:
+    return _catalog_payload(build_parser(), verbose=verbose)
 
 
-def get_command_help_payload(command: str) -> dict[str, Any] | None:
+def get_command_help_payload(command: str, *, verbose: bool = False) -> dict[str, Any] | None:
     path = _split_command_path(command)
     if not path:
-        return get_catalog_payload()
-    return _command_payload(build_parser(), path)
+        return get_catalog_payload(verbose=verbose)
+    return _command_payload(build_parser(), path, verbose=verbose)
 
 
 def invoke_command(
