@@ -1,10 +1,32 @@
 # Building a CLI-Style HTTP API for LLM Agents
 
+## Why This Pattern
+
+LLM agents can only handle a limited number of MCP tools before context pressure degrades reasoning quality. TM Forum has over 50 published Open APIs, and each API exposes dozens of operations. Wiring even a modest slice of that surface directly into an MCP tool list produces thousands of tools — 50 APIs at 20 operations each is already 1,000 tools, far beyond what any agent runtime handles reliably today.
+
+Agent-facing interfaces built on standard MCP tool lists become impossible at scale. Many agent runtimes resend the full tool list on each model call or session turn. In that common pattern, a large MCP tool surface becomes repeated context cost — paid whether or not the agent uses those tools.
+
+The HTTP CLI API pattern shifts that cost: only the commands the agent actually inspects consume context, not the full surface up front.
+
+**Practical reasons to prefer it:**
+
+- **Compact discovery** — agents start with `GET /api/cli` instead of ingesting the full MCP tool list. One line per command.
+- **Progressive help** — agents expand one command branch at a time with `help`. Full schema is fetched on demand, not broadcast to every caller.
+- **Lower token cost** — the compact CLI path is materially smaller than a wrapped MCP tool payload. In the TMF620 reference implementation: `3,735` tokens for the OpenAI-wrapped MCP tool payload vs. `189` tokens for the initial catalog, and `512` tokens through a full catalog + group help + leaf help traversal.
+- **Simpler automation** — `curl` works for both humans and agents. No SDK, no MCP client library required.
+- **One shared command layer** — the same command definitions back the HTTP CLI API, the MCP adapter, and any benchmark or test tooling.
+
+This pattern is not claiming a universal MCP tool-count limit. The point is pragmatic: once you have a few dozen tools, full-tool discovery becomes expensive enough that progressive CLI discovery is easier to justify and easier to benchmark. The benchmark numbers above are from a real implementation with `38` generated command tools plus `2` compatibility tools in the MCP adapter.
+
+**Security note:** making a large command surface discoverable and invokable by an agent increases the attack surface. Authentication, authorization, rate limiting, and audit logging are not optional at this scale — see [Things to Consider](#things-to-consider) for details.
+
+---
+
 ## What This Pattern Is
 
 A CLI-style HTTP API is a single-endpoint HTTP interface designed for LLM agents to discover and invoke server-side tools interactively — the same way a human uses a command-line tool with `--help`.
 
-```
+```text
 POST /api/cli
 { "command": "<name>", "args": { ... }, "stream": false }
 ```
@@ -22,7 +44,7 @@ This pattern is well-suited for services with many tools because the LLM pays co
 **1. Single endpoint, command dispatch**
 All tools are reachable through one URL. The LLM constructs `{"command": "...", "args": {...}}` — no URL templating, no per-tool routes to remember.
 
-**2. Progressive disclosure**
+**2. Progressive disclosure** — the LLM fetches detail on demand, not all at once:
 
 - `GET /api/cli` → names + one-line summaries only (compact)
 - `POST {"command": "help", "args": {"command": "<name>"}}` → full schema for one tool
@@ -401,7 +423,7 @@ POST /api/cli
 {"command": "list_items", "args": {"category": "electronics", "limit": 5}, "stream": true}
 ```
 
-```
+```ndjson
 {"type": "started", "command": "list_items"}
 {"type": "item", "data": {"id": 1, "name": "Laptop", ...}}
 {"type": "item", "data": {"id": 2, "name": "Phone", ...}}
@@ -414,7 +436,7 @@ POST /api/cli
 
 ### Basic flow
 
-```
+```text
 1. GET  /api/cli                                          → discover what exists
 2. POST {"command": "help", "args": {"command": "..."}}   → inspect one tool
 3. POST {"command": "...", "args": {...}}                  → invoke
@@ -425,7 +447,7 @@ POST /api/cli
 
 Add a `semantic_find` command backed by a vector search over tool names and descriptions. The LLM narrows by intent before browsing:
 
-```
+```text
 1. POST {"command": "semantic_find", "args": {"query": "find products by price range"}}
    → returns 3-5 relevant command summaries
 2. POST {"command": "help", "args": {"command": "search_items"}}
@@ -438,7 +460,7 @@ Add a `semantic_find` command backed by a vector search over tool names and desc
 
 Keep it minimal — the interface is self-describing:
 
-```
+```text
 You have access to a CLI API at POST /api/cli.
 Start with GET /api/cli to discover available commands.
 Use {"command": "help", "args": {"command": "<name>"}} to get full parameter details before invoking.
@@ -672,7 +694,13 @@ The tool functions, registry, schema helpers, and catalog/help payloads are writ
 
 ## Things to Consider
 
-**Auth** — the `/api/cli` endpoint has no authentication by default. Sit behind a reverse proxy that handles API keys or JWT before exposing remotely.
+**Security** — a discoverable, agent-invokable command surface requires deliberate hardening. The more commands you expose, the larger the blast radius of a compromised or misbehaving agent. Treat this as a mandatory concern, not an afterthought:
+
+- **Authentication** — the `/api/cli` endpoint has no authentication by default. Sit behind a reverse proxy that enforces API keys, JWT, or mTLS before exposing remotely. Never expose the endpoint on a public network without auth.
+- **Authorization** — authentication tells you who the caller is; authorization controls what they can invoke. Scope tokens to the command groups an agent actually needs. An agent handling read-only catalog queries should not be able to invoke mutation or admin commands.
+- **Rate limiting** — agents can invoke commands in tight loops. Without rate limiting, a runaway agent or a prompt-injected instruction can exhaust downstream API quotas or trigger unintended bulk operations.
+- **Audit logging** — log every invocation with the caller identity, command name, arguments, and response status. At scale this is essential for diagnosing agent misbehavior and satisfying compliance requirements.
+- **Input validation** — validate all args before passing them to tools. Prompt injection via crafted argument values is a real vector when the caller is an LLM.
 
 **Read vs write** — be deliberate about what goes in the CLI registry. A good default: if a tool modifies state, it does not belong in the CLI registry unless there is an explicit reason.
 
