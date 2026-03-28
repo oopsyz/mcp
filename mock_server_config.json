@@ -1,6 +1,6 @@
 {
   "server": {
-    "host": "localhost",
+    "host": "0.0.0.0",
     "port": 8801,
     "protocol": "http",
     "name": "TMF620 Mock API Server",

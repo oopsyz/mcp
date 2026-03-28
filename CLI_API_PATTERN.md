@@ -2,85 +2,84 @@
 
 ## Why This Pattern
 
-LLM agents can only handle a limited number of MCP tools before context pressure degrades reasoning quality. TM Forum has over 50 published Open APIs, and each API exposes dozens of operations. Wiring even a modest slice of that surface directly into an MCP tool list produces thousands of tools — 50 APIs at 20 operations each is already 1,000 tools, far beyond what any agent runtime handles reliably today.
+Large MCP tool lists do not scale well for agent use. As the number of tools grows, many runtimes keep resending the full tool surface, which turns discovery into repeated context cost.
 
-Agent-facing interfaces built on standard MCP tool lists become impossible at scale. Many agent runtimes resend the full tool list on each model call or session turn. In that common pattern, a large MCP tool surface becomes repeated context cost — paid whether or not the agent uses those tools.
+A CLI-style HTTP API shifts that cost. The agent starts with a compact catalog, asks for help on one command at a time, and only pays for the part of the surface it actually uses.
 
-The HTTP CLI API pattern shifts that cost: only the commands the agent actually inspects consume context, not the full surface up front.
+Practical benefits:
 
-**Practical reasons to prefer it:**
+- Compact discovery with `GET /api/cli`
+- Progressive help with `POST /api/cli {"command":"help",...}`
+- Lower token cost than exposing every operation as a separate tool
+- Simple automation with `curl`
+- One shared command layer for HTTP, MCP, tests, and benchmarks
 
-- **Compact discovery** — agents start with `GET /api/cli` instead of ingesting the full MCP tool list. One line per command.
-- **Progressive help** — agents expand one command branch at a time with `help`. Full schema is fetched on demand, not broadcast to every caller.
-- **Lower token cost** — the compact CLI path is materially smaller than a wrapped MCP tool payload. In the TMF620 reference implementation: `3,735` tokens for the OpenAI-wrapped MCP tool payload vs. `189` tokens for the initial catalog, and `512` tokens through a full catalog + group help + leaf help traversal.
-- **Simpler automation** — `curl` works for both humans and agents. No SDK, no MCP client library required.
-- **One shared command layer** — the same command definitions back the HTTP CLI API, the MCP adapter, and any benchmark or test tooling.
-
-This pattern is not claiming a universal MCP tool-count limit. The point is pragmatic: once you have a few dozen tools, full-tool discovery becomes expensive enough that progressive CLI discovery is easier to justify and easier to benchmark. The benchmark numbers above are from a real implementation with `38` generated command tools plus `2` compatibility tools in the MCP adapter.
-
-**Security note:** making a large command surface discoverable and invokable by an agent increases the attack surface. Authentication, authorization, rate limiting, and audit logging are not optional at this scale — see [Things to Consider](#things-to-consider) for details.
+This pattern is especially useful when a service has dozens of operations or more.
 
 ---
 
 ## What This Pattern Is
 
-A CLI-style HTTP API is a single-endpoint HTTP interface designed for LLM agents to discover and invoke server-side tools interactively — the same way a human uses a command-line tool with `--help`.
+A CLI-style HTTP API is a single-endpoint interface for discovery and invocation:
 
 ```text
 POST /api/cli
 { "command": "<name>", "args": { ... }, "stream": false }
 ```
 
-One endpoint. All tools. Discovery built in. No URL construction, no per-tool routes.
+One endpoint. One request envelope. Built-in help.
 
-Example: in the TMF620 repo, the MCP adapter exposes `38` generated command tools plus `2` compatibility tools. The measured wrapped MCP tool payload is `3,735` tokens, while compact `GET /api/cli` is `189` tokens, compact group help is `105` tokens, and compact catalog + group help + leaf help is `512` tokens. That gap is why the rest of this pattern prefers compact progressive discovery for larger surfaces.
+The agent workflow is:
 
-This pattern is well-suited for services with many tools because the LLM pays context cost proportional to what it actually uses — not the full tool surface upfront.
+1. `GET /api/cli`
+2. `POST /api/cli {"command":"help","args":{"command":"..."}}`
+3. `POST /api/cli {"command":"...","args":{...}}`
 
 ---
 
 ## Core Principles
 
-**1. Single endpoint, command dispatch**
-All tools are reachable through one URL. The LLM constructs `{"command": "...", "args": {...}}` — no URL templating, no per-tool routes to remember.
+### 1. Single endpoint
 
-**2. Progressive disclosure** — the LLM fetches detail on demand, not all at once:
+All discovery and invocation happen through one URL.
 
-- `GET /api/cli` → names + one-line summaries only (compact)
-- `POST {"command": "help", "args": {"command": "<name>"}}` → full schema for one tool
-- `POST {"command": "...", "args": {...}}` → invoke
+### 2. Progressive disclosure
 
-The LLM fetches detail on demand, not all at once.
+The catalog stays compact. Full detail is fetched only for one command at a time.
 
-Compact-by-default catalogs are preferable for large services. If you want a richer top-level catalog for debugging or manual inspection, expose it behind an explicit switch such as `GET /api/cli?verbose=true` instead of making every caller pay that cost by default. The same principle applies to branch help: group nodes can stay compact, while leaf-command help expands to the full argument schema.
+- `GET /api/cli` -> compact catalog
+- `POST {"command":"help","args":{"command":"<name>"}}` -> detailed help
+- `POST {"command":"<name>","args":{...}}` -> invoke
 
-If you want to validate the tradeoff in a real implementation, build a small benchmark that tokenizes the compact catalog, compact group help, leaf help, and the wrapped MCP tool payload. That makes the savings visible instead of theoretical.
+### 3. Help is part of the protocol
 
-**3. Help is a first-class command**
-`help` is a reserved command name. The LLM can always ask what's available and how to use it — no out-of-band documentation needed.
+`help` is a reserved command. Agents should not need out-of-band docs.
 
-**4. Schema is yours to control**
-Unlike MCP JSON Schema (derived from type annotations), the CLI schema is a dict you build. You can add enums, valid ranges, domain hints, warnings, and examples that JSON Schema can't express.
+### 4. Schema is curated
 
-**5. Read vs destructive separation**
-Decide explicitly which tools belong in the CLI registry. Destructive or privileged tools should require deliberate exposure — not be included by default.
+You control the help payload. Add examples, enums, ranges, warnings, and domain hints where useful.
 
-**6. Streaming is opt-in**
-`"stream": true` switches the response to NDJSON chunked transfer. Non-streaming callers are unaffected.
+### 5. Registry scope is explicit
+
+Decide intentionally which commands belong in the agent-facing registry. Starting with read-oriented commands is often the safest default, but the wire contract should not force one policy for every service.
+
+### 6. Streaming is opt-in
+
+Streaming should only happen when the caller sets `"stream": true`.
 
 ---
 
-## Building It: Step by Step
+## Building It
 
-### Step 1 — Write your tools as async functions
+### Step 1 - Write tools as async functions
 
 ```python
 async def list_items(context, category: str = "all", limit: int = 20) -> dict:
     """
     List items in the catalogue.
 
-    :param category: Filter by category (default: all).
-    :param limit: Maximum number of items to return (default: 20).
+    :param category: Filter by category.
+    :param limit: Maximum number of items to return.
     """
     rows = await db.fetch("SELECT * FROM items WHERE category = $1 LIMIT $2", category, limit)
     return {
@@ -90,31 +89,30 @@ async def list_items(context, category: str = "all", limit: int = 20) -> dict:
     }
 ```
 
-Key conventions:
+Conventions:
 
-- First parameter is `context` (MCP lifecycle, can be `None` for HTTP callers — don't rely on it)
-- Return a dict with an `items` list, or adapt a richer internal response shape so the CLI layer can still stream from an item list naturally
-- Docstring first line becomes the catalog summary; full docstring goes in per-command help
+- The first parameter is `context`
+- Tools usually return a dict
+- List-like commands should preferably return `{"items": [...], ...}` so streaming stays natural
 
-### Step 2 — Define two registries
+### Step 2 - Define registries
 
 ```python
-# All tools registered internally (full surface)
 def _all_tool_names() -> list[str]:
     return [
         "list_items",
         "get_item",
         "search_items",
         "health",
-        "create_item",   # kept here but NOT in CLI registry
-        "delete_item",   # kept here but NOT in CLI registry
+        "create_item",
+        "delete_item",
     ]
+
 
 def _all_tool_registry() -> dict[str, object]:
     return {name: globals()[name] for name in _all_tool_names()}
 
 
-# CLI-exposed subset (read-only, safe for agents)
 def _cli_command_names() -> list[str]:
     return [
         "list_items",
@@ -123,17 +121,19 @@ def _cli_command_names() -> list[str]:
         "health",
     ]
 
+
 def _cli_command_registry() -> dict[str, object]:
     registry = _all_tool_registry()
     return {name: registry[name] for name in _cli_command_names() if name in registry}
 ```
 
-The split is intentional — the full registry may include mutation or admin tools. The CLI registry is the safe, agent-facing subset.
+The split is intentional. Internal and agent-facing registries do not have to be the same.
 
-### Step 3 — Build the schema helpers
+### Step 3 - Build schema helpers
 
 ```python
 import inspect
+
 
 def _annotation_name(annotation) -> str | None:
     if annotation is inspect.Signature.empty:
@@ -144,50 +144,40 @@ def _annotation_name(annotation) -> str | None:
 
 
 def _describe_tool(tool_name: str, tool) -> dict:
-    """Full schema for per-command help."""
     sig = inspect.signature(tool)
-    parameters = []
+    arguments = []
     for param in sig.parameters.values():
         if param.name == "context":
             continue
-        parameters.append({
-            "name": param.name,
-            "required": param.default is inspect.Parameter.empty,
-            "default": None if param.default is inspect.Parameter.empty else param.default,
-            "annotation": _annotation_name(param.annotation),
-        })
+        arguments.append(
+            {
+                "name": param.name,
+                "required": param.default is inspect.Parameter.empty,
+                "default": None if param.default is inspect.Parameter.empty else param.default,
+                "type": _annotation_name(param.annotation),
+            }
+        )
     return {
-        "name": tool_name,
-        "summary": inspect.getdoc(tool) or "",
-        "parameters": parameters,
+        "command": tool_name,
+        "summary": (inspect.getdoc(tool) or "").splitlines()[0] if inspect.getdoc(tool) else "",
+        "description": inspect.getdoc(tool) or "",
+        "arguments": arguments,
     }
 
 
-def _describe_tool_summary(tool_name: str, tool) -> dict:
-    """One-liner for the catalog."""
-    doc = inspect.getdoc(tool) or ""
-    return {
-        "name": tool_name,
-        "summary": doc.splitlines()[0] if doc else "",
-    }
-
-
-def _usage_example(tool_name: str, parameters: list[dict]) -> dict:
+def _usage_example(tool_name: str, arguments: list[dict]) -> dict:
     args = {}
-    for p in parameters:
-        if p["required"]:
-            args[p["name"]] = f"<{p['name']}>"
-        elif p["default"] is not None:
-            args[p["name"]] = p["default"]
+    for arg in arguments:
+        if arg["required"]:
+            args[arg["name"]] = f"<{arg['name']}>"
+        elif arg["default"] is not None:
+            args[arg["name"]] = arg["default"]
     return {"command": tool_name, "args": args}
 ```
 
-### Step 4 — Enrich schemas with domain knowledge
-
-The base `_describe_tool` derives everything from type annotations. Enrich it for parameters where valid values are finite or constrained:
+### Step 4 - Enrich with domain knowledge
 
 ```python
-# Extend _describe_tool output for specific commands
 _PARAMETER_ENRICHMENTS = {
     "list_items": {
         "category": {
@@ -198,274 +188,273 @@ _PARAMETER_ENRICHMENTS = {
             "range": [1, 100],
             "description": "Number of items to return. Max 100.",
         },
-    },
-    "search_items": {
-        "sort": {
-            "enum": ["relevance", "price_asc", "price_desc", "newest"],
-        },
-    },
+    }
 }
+
 
 def _describe_command(tool_name: str, tool) -> dict:
     details = _describe_tool(tool_name, tool)
     enrichments = _PARAMETER_ENRICHMENTS.get(tool_name, {})
-    for param in details["parameters"]:
-        extra = enrichments.get(param["name"], {})
-        param.update(extra)
-    details["usage"] = _usage_example(tool_name, details["parameters"])
-    details["streaming"] = {
-        "supported": True,
-        "enable": "Add \"stream\": true alongside \"command\" and \"args\".",
-    }
+    for arg in details["arguments"]:
+        arg.update(enrichments.get(arg["name"], {}))
+    details["examples"] = [
+        {
+            "description": f"Invoke {tool_name}",
+            "request": _usage_example(tool_name, details["arguments"]),
+        }
+    ]
     return details
 ```
 
-Enrichments to consider per parameter:
+Useful fields include:
 
-- `enum` — finite set of valid values
-- `range` — `[min, max]` for numeric parameters
-- `description` — domain-specific explanation beyond what the docstring says
-- `example` — a concrete value the LLM can copy
-- `warning` — side effects or gotchas ("this query can be slow on large datasets")
+- `enum`
+- `range`
+- `description`
+- `example`
+- `warning`
 
-### Step 5 — Build the catalog and help payloads
+### Step 5 - Build discovery and help payloads
 
 ```python
 def _catalog_payload() -> dict:
     registry = _cli_command_registry()
-    commands = [
-        _describe_tool_summary(name, registry[name])
-        for name in sorted(registry)
-    ]
+    commands = []
+    for name in sorted(registry):
+        commands.append(
+            {
+                "name": name,
+                "kind": "command",
+                "summary": (inspect.getdoc(registry[name]) or "").splitlines()[0],
+            }
+        )
     return {
         "status": "ok",
-        "service": "my-service",
         "interface": "cli",
+        "version": "1.0",
+        "service": "my-service",
         "how_to_invoke": {
             "endpoint": "POST /api/cli",
             "shape": {"command": "<command_name>", "args": {}, "stream": False},
         },
         "how_to_get_help": {
-            "all_commands": "GET /api/cli  or  POST /api/cli {\"command\": \"help\"}",
+            "all_commands": "GET /api/cli or POST /api/cli {\"command\": \"help\"}",
             "one_command": "POST /api/cli {\"command\": \"help\", \"args\": {\"command\": \"<name>\"}}",
-        },
-        "streaming": {
-            "supported": True,
-            "enable": "Add \"stream\": true to any command request.",
-            "content_type": "application/x-ndjson",
-            "chunk_types": {
-                "started": "Emitted immediately when the request is accepted.",
-                "item": "One chunk per result item (tools that return an items array).",
-                "done": "Final chunk with total item count and result metadata.",
-                "result": "Single-chunk response for tools that do not return an items array.",
-                "error": "Emitted on tool error or unexpected exception.",
-            },
         },
         "commands": commands,
         "total": len(commands),
     }
 
-For larger command sets, keep this catalog payload compact by default. If you also want a richer catalog, expose it through an explicit `verbose=true` switch or a separate helper rather than expanding the default discovery response.
 
 def _command_help_payload(command_name: str) -> dict | None:
     registry = _cli_command_registry()
     tool = registry.get(command_name)
     if tool is None:
         return None
-    params = _describe_tool(command_name, tool)["parameters"]
     return {
         "status": "ok",
-        "service": "my-service",
         "interface": "cli",
-        "how_to_invoke": {
-            "endpoint": "POST /api/cli",
-            "shape": _usage_example(command_name, params),
-        },
-        "how_to_stream": {
-            "example": {**_usage_example(command_name, params), "stream": True},
-        },
-        "command": _describe_command(command_name, tool),
+        "version": "1.0",
+        "command": command_name,
+        **_describe_command(command_name, tool),
     }
 ```
 
-### Step 6 — The streaming generator
+Keep the default catalog compact. If you want a richer debugging view, expose that separately or behind an explicit switch.
+
+### Step 6 - Add streaming
 
 ```python
-from starlette.responses import StreamingResponse
 import json
 
+
 async def _stream_cli_response(command: str, args: dict):
-    yield json.dumps({"type": "started", "command": command}) + "\n"
+    yield json.dumps(
+        {"type": "started", "command": command, "interface": "cli", "version": "1.0"}
+    ) + "\n"
+
     try:
         tool_response = await _invoke_tool(command, args)
         body = json.loads(tool_response.body)
+
         if tool_response.status_code != 200:
             yield json.dumps({"type": "error", "error": body.get("error", {})}) + "\n"
             return
+
         result = body.get("result", {})
         items = result.get("items") if isinstance(result, dict) else None
+
         if isinstance(items, list):
             for item in items:
                 yield json.dumps({"type": "item", "data": item}) + "\n"
             meta = {k: v for k, v in result.items() if k != "items"}
-            yield json.dumps({"type": "done", "command": command, "total": len(items), **meta}) + "\n"
-        else:
-            yield json.dumps({"type": "result", "command": command, "data": result}) + "\n"
+            yield json.dumps(
+                {"type": "done", "command": command, "total": len(items), **meta}
+            ) + "\n"
+            return
+
+        yield json.dumps({"type": "result", "command": command, "data": result}) + "\n"
     except Exception as exc:
-        yield json.dumps({"type": "error", "error": {"code": "stream_failed", "message": str(exc)}}) + "\n"
+        yield json.dumps(
+            {"type": "error", "error": {"code": "stream_failed", "message": str(exc)}}
+        ) + "\n"
 ```
 
-### Step 7 — The route handler
+### Step 7 - Add the route handler
 
 ```python
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 
+
+def _error(status_code: int, code: str, message: str) -> JSONResponse:
+    return JSONResponse(
+        {
+            "status": "error",
+            "interface": "cli",
+            "version": "1.0",
+            "error": {"code": code, "message": message},
+        },
+        status_code=status_code,
+    )
+
+
 @app.custom_route("/api/cli", methods=["GET"])
-async def cli_help(request: Request):
+async def cli_catalog(request: Request):
     return JSONResponse(_catalog_payload())
 
 
 @app.custom_route("/api/cli", methods=["POST"])
-async def cli_invoke(request: Request):
+async def cli_dispatch(request: Request):
     try:
         payload = await request.json()
     except Exception:
-        return JSONResponse({"status": "error", "error": {"code": "invalid_json", "message": "Request body must be valid JSON."}}, status_code=400)
+        return _error(400, "invalid_json", "Request body must be valid JSON.")
 
     if not isinstance(payload, dict):
-        return JSONResponse({"status": "error", "error": {"code": "invalid_request", "message": "Request body must be a JSON object."}}, status_code=400)
+        return _error(400, "invalid_request", "Request body must be a JSON object.")
 
     command = payload.get("command")
     if not isinstance(command, str) or not command.strip():
-        return JSONResponse({"status": "error", "error": {"code": "invalid_command", "message": "'command' must be a non-empty string."}}, status_code=400)
+        return _error(400, "invalid_command", "'command' must be a non-empty string.")
 
     args = payload.get("args", {})
     if not isinstance(args, dict):
-        return JSONResponse({"status": "error", "error": {"code": "invalid_arguments", "message": "'args' must be a JSON object."}}, status_code=400)
+        return _error(400, "invalid_arguments", "'args' must be a JSON object.")
 
     stream = payload.get("stream", False)
     if not isinstance(stream, bool):
-        return JSONResponse({"status": "error", "error": {"code": "invalid_request", "message": "'stream' must be a boolean."}}, status_code=400)
+        return _error(400, "invalid_request", "'stream' must be a boolean.")
 
     normalized = command.strip()
 
-    # help command
     if normalized == "help":
         target = args.get("command")
-        if target:
-            result = _command_help_payload(target.strip())
-            if result is None:
-                return JSONResponse({"status": "error", "error": {"code": "command_not_found", "message": f"Unknown command: {target}"}}, status_code=404)
-            return JSONResponse(result)
-        return JSONResponse(_catalog_payload())
+        if target is None:
+            return JSONResponse(_catalog_payload())
+        if not isinstance(target, str) or not target.strip():
+            return _error(400, "invalid_arguments", "'args.command' must be a non-empty string.")
+        result = _command_help_payload(target.strip())
+        if result is None:
+            return _error(404, "help_target_not_found", f"Unknown help target: {target}")
+        return JSONResponse(result)
 
     if normalized not in _cli_command_registry():
-        return JSONResponse({"status": "error", "error": {"code": "command_not_found", "message": f"Unknown command: {normalized}"}}, status_code=404)
+        return _error(404, "command_not_found", f"Unknown command: {normalized}")
 
     if stream:
-        return StreamingResponse(_stream_cli_response(normalized, args), media_type="application/x-ndjson")
+        return StreamingResponse(
+            _stream_cli_response(normalized, args),
+            media_type="application/x-ndjson",
+        )
 
     tool_response = await _invoke_tool(normalized, args)
     if tool_response.status_code != 200:
         return tool_response
 
     body = json.loads(tool_response.body)
-    return JSONResponse({"status": "ok", "interface": "cli", "command": body["tool"], "args": body["arguments"], "result": body["result"]})
+    return JSONResponse(
+        {
+            "status": "ok",
+            "interface": "cli",
+            "version": "1.0",
+            "command": normalized,
+            "result": body["result"],
+        }
+    )
 ```
 
 ---
 
-## What the LLM Sees at Each Level
+## What the Agent Sees
 
-### Level 1 — Catalog (`GET /api/cli`)
+### Level 1 - Catalog
 
 ```json
 {
   "status": "ok",
-  "how_to_invoke": { "endpoint": "POST /api/cli", "shape": {...} },
-  "how_to_get_help": { "one_command": "POST /api/cli {\"command\": \"help\", ...}" },
-  "streaming": { "supported": true, ... },
+  "interface": "cli",
+  "version": "1.0",
   "commands": [
-    {"name": "get_item", "summary": "Retrieve a single item by ID."},
-    {"name": "list_items", "summary": "List items in the catalogue."},
-    {"name": "search_items", "summary": "Semantic search over the item catalogue."}
+    {"name": "get_item", "kind": "command", "summary": "Retrieve a single item by ID."},
+    {"name": "list_items", "kind": "command", "summary": "List items in the catalogue."},
+    {"name": "search_items", "kind": "command", "summary": "Semantic search over the item catalogue."}
   ],
   "total": 3
 }
 ```
 
-~100 bytes per command. Scales to 100 tools without bloating context.
-
-### Level 2 — Command detail (`POST {"command": "help", "args": {"command": "list_items"}}`)
+### Level 2 - Command help
 
 ```json
 {
-  "how_to_invoke": { "shape": {"command": "list_items", "args": {"limit": 20}} },
-  "how_to_stream": { "example": {"command": "list_items", "args": {"limit": 20}, "stream": true} },
-  "command": {
-    "name": "list_items",
-    "summary": "List items in the catalogue.\n\n:param category: ...",
-    "parameters": [
-      {"name": "category", "required": false, "default": "all", "enum": ["all", "electronics", ...]},
-      {"name": "limit", "required": false, "default": 20, "range": [1, 100]}
-    ],
-    "usage": {"command": "list_items", "args": {"limit": 20}},
-    "streaming": {"supported": true, "enable": "Add \"stream\": true ..."}
-  }
+  "status": "ok",
+  "interface": "cli",
+  "version": "1.0",
+  "command": "list_items",
+  "summary": "List items in the catalogue.",
+  "arguments": [
+    {"name": "category", "required": false, "default": "all", "enum": ["all", "electronics"]},
+    {"name": "limit", "required": false, "default": 20, "range": [1, 100]}
+  ],
+  "examples": [
+    {
+      "description": "Invoke list_items",
+      "request": {"command": "list_items", "args": {"category": "all", "limit": 20}}
+    }
+  ]
 }
 ```
 
-### Level 3 — Invocation
+### Level 3 - Invocation
 
 ```json
 POST /api/cli
-{"command": "list_items", "args": {"category": "electronics", "limit": 5}, "stream": true}
+{"command":"list_items","args":{"category":"electronics","limit":5},"stream":true}
 ```
 
 ```ndjson
-{"type": "started", "command": "list_items"}
-{"type": "item", "data": {"id": 1, "name": "Laptop", ...}}
-{"type": "item", "data": {"id": 2, "name": "Phone", ...}}
-{"type": "done", "total": 2, "dataset": "catalogue"}
+{"type":"started","command":"list_items","interface":"cli","version":"1.0"}
+{"type":"item","data":{"id":1,"name":"Laptop"}}
+{"type":"item","data":{"id":2,"name":"Phone"}}
+{"type":"done","command":"list_items","total":2,"dataset":"catalogue"}
 ```
 
 ---
 
-## LLM Interaction Flow
+## Interaction Flow
 
-### Basic flow
-
-```text
-1. GET  /api/cli                                          → discover what exists
-2. POST {"command": "help", "args": {"command": "..."}}   → inspect one tool
-3. POST {"command": "...", "args": {...}}                  → invoke
-4. POST {"command": "...", "args": {...}}                  → refine or chain
-```
-
-### With semantic discovery (recommended at 50+ tools)
-
-Add a `semantic_find` command backed by a vector search over tool names and descriptions. The LLM narrows by intent before browsing:
+### Basic
 
 ```text
-1. POST {"command": "semantic_find", "args": {"query": "find products by price range"}}
-   → returns 3-5 relevant command summaries
-2. POST {"command": "help", "args": {"command": "search_items"}}
-   → full schema
-3. POST {"command": "search_items", "args": {...}, "stream": true}
-   → streamed results
+1. GET  /api/cli                                        -> discover commands
+2. POST {"command":"help","args":{"command":"..."}}     -> inspect one command
+3. POST {"command":"...","args":{...}}                  -> invoke
 ```
 
-### System prompt for the LLM
+### With semantic narrowing
 
-Keep it minimal — the interface is self-describing:
-
-```text
-You have access to a CLI API at POST /api/cli.
-Start with GET /api/cli to discover available commands.
-Use {"command": "help", "args": {"command": "<name>"}} to get full parameter details before invoking.
-Use "stream": true for commands that return large result sets.
-```
+At larger tool counts, add a `semantic_find` command so the agent can narrow before opening help for a specific command.
 
 ---
 
@@ -473,146 +462,69 @@ Use "stream": true for commands that return large result sets.
 
 ### Registry
 
-- [ ] Separate full internal registry from CLI-exposed subset
-- [ ] Exclude destructive, privileged, or mutation tools from CLI registry
-- [ ] All CLI tools return `{"items": [...], ...}` for streaming to work naturally
-- [ ] Tools that don't return items (health checks, single-record lookups) return a flat dict
-
-### Schema
-
-- [ ] First line of every docstring is a clear one-liner (used as catalog summary)
-- [ ] All parameters have type annotations
-- [ ] Enums added for parameters with finite valid values
-- [ ] Ranges added for numeric parameters with bounds
-- [ ] At least one usage example per command
+- [ ] Separate internal and CLI-facing registries if needed
+- [ ] Decide explicitly which write or destructive commands belong in the CLI registry
+- [ ] Prefer `{"items": [...], ...}` for list-like commands
 
 ### Discovery
 
-- [ ] `GET /api/cli` returns catalog with summaries only (not full schemas)
-- [ ] `POST {"command": "help"}` returns same catalog
-- [ ] `POST {"command": "help", "args": {"command": "<name>"}}` returns full detail
-- [ ] Catalog includes `how_to_invoke` and `how_to_get_help` instructions
-- [ ] Unknown command returns `command_not_found` error with 404
-
-### Streaming
-
-- [ ] `"stream": true` switches to `StreamingResponse` with `application/x-ndjson`
-- [ ] Generator emits `started` immediately
-- [ ] Generator emits one `item` chunk per element in `items`
-- [ ] Generator emits `done` with total and metadata
-- [ ] Generator emits `error` chunk on exception (does not raise)
-- [ ] Non-streaming path unchanged for clients that don't set `"stream": true`
+- [ ] `GET /api/cli` returns a compact catalog
+- [ ] `POST {"command":"help"}` returns the same catalog
+- [ ] `POST {"command":"help","args":{"command":"<name>"}}` returns detailed help
+- [ ] Unknown help targets return `help_target_not_found`
+- [ ] Unknown commands return `command_not_found`
 
 ### Error handling
 
-- [ ] Invalid JSON → 400 `invalid_json`
-- [ ] Non-object body → 400 `invalid_request`
-- [ ] Missing or empty command → 400 `invalid_command`
-- [ ] Non-object args → 400 `invalid_arguments`
-- [ ] Unknown command → 404 `command_not_found`
-- [ ] Tool invocation error → 500 `tool_invocation_failed` with message
+- [ ] Invalid JSON -> `invalid_json`
+- [ ] Non-object body -> `invalid_request`
+- [ ] Missing or empty command -> `invalid_command`
+- [ ] Non-object args -> `invalid_arguments`
+- [ ] Tool failure -> `tool_invocation_failed`
+
+### Streaming
+
+- [ ] Streaming is only enabled by `"stream": true`
+- [ ] First chunk is `started`
+- [ ] Item collections emit `item` then `done`
+- [ ] Single-result commands emit `result`
+- [ ] Stream-time failures emit `error`
 
 ---
 
 ## Client Integrations
 
-### Bash / curl — LLMs with bash tool and shell scripts
-
-No client library needed. Any environment with `curl` can use the service.
-
-**Discover:**
+### Bash / curl
 
 ```bash
 curl -s http://myserver:9000/api/cli | jq .
 ```
 
-**Inspect a command:**
+```bash
+curl -s -X POST http://myserver:9000/api/cli \
+  -H "Content-Type: application/json" \
+  -d '{"command":"help","args":{"command":"list_items"}}' | jq .
+```
 
 ```bash
 curl -s -X POST http://myserver:9000/api/cli \
   -H "Content-Type: application/json" \
-  -d '{"command": "help", "args": {"command": "list_items"}}' | jq .
+  -d '{"command":"list_items","args":{"category":"electronics","limit":5}}' | jq .
 ```
-
-**Invoke:**
-
-```bash
-curl -s -X POST http://myserver:9000/api/cli \
-  -H "Content-Type: application/json" \
-  -d '{"command": "list_items", "args": {"category": "electronics", "limit": 5}}' | jq .
-```
-
-**Stream (NDJSON):**
 
 ```bash
 curl -s --no-buffer -X POST http://myserver:9000/api/cli \
   -H "Content-Type: application/json" \
-  -d '{"command": "list_items", "args": {"limit": 100}, "stream": true}'
+  -d '{"command":"list_items","args":{"limit":100},"stream":true}'
 ```
 
-**Reusable shell helper:**
+### MCP
 
-```bash
-#!/bin/bash
-MCP_URL="${MY_SERVICE_URL:-http://localhost:9000}"
-
-cli() {
-  local command=$1
-  local args=${2:-'{}'}
-  curl -s -X POST "$MCP_URL/api/cli" \
-    -H "Content-Type: application/json" \
-    -d "{\"command\": \"$command\", \"args\": $args}" | jq .
-}
-
-cli list_items '{"category": "electronics"}'
-cli help '{"command": "search_items"}'
-```
-
-**An LLM with a bash tool** follows the same discover → inspect → invoke pattern a human would. No MCP, no SDK — just `curl`. The system prompt can be as simple as:
-
-```text
-You have bash access. The service is at http://myserver:9000.
-Run: curl -s http://myserver:9000/api/cli | jq .
-to discover available commands, then invoke them as needed.
-```
-
----
-
-### MCP — Claude Desktop and MCP-aware frameworks
-
-TMF620 is a concrete example of why this matters: the wrapped MCP tool payload is `3,735` tokens for `40` visible tools in the adapter, while the compact HTTP CLI path is `189` tokens for the initial catalog and `512` tokens through one leaf command. The exact numbers vary by schema size, but the shape of the tradeoff is stable: MCP discovery grows with the tool surface, while compact CLI discovery grows with only the branch the agent actually inspects.
-
-For MCP clients, expose a single `cli` tool that proxies to the same underlying command registry. The MCP client sees **one tool** instead of the full surface — the LLM drives discovery through `help` exactly as it would over HTTP.
-
-**Why one tool, not many:**
-
-- MCP `tools/list` sends full JSON Schema for every registered tool upfront
-- At 20 tools: ~14KB in context before the LLM does anything; at 100 tools: ~70KB
-- A single `cli` tool keeps `tools/list` tiny; the LLM pays context cost only for commands it actually uses
-
-**Implementation — direct function calls (no HTTP round-trip):**
+For MCP clients, expose one `cli` tool that proxies to the same command registry. That keeps `tools/list` small while preserving the same discover -> help -> invoke workflow.
 
 ```python
-from mcp.server.fastmcp import Context
-
 @app.tool()
-async def cli(
-    context: Context,
-    command: str,
-    args: dict = {},
-    stream: bool = False,
-) -> dict:
-    """
-    Invoke a service command interactively.
-
-    Start with command='help' to discover available commands.
-    Use command='help', args={'command': '<name>'} for full parameter details.
-    Supports all commands from GET /api/cli.
-
-    :param command: Command name to invoke, or 'help' for discovery.
-    :param args: Command arguments as a key-value dict.
-    :param stream: Not applicable via MCP — use HTTP /api/cli for streaming.
-    """
+async def cli(context, command: str, args: dict = {}, stream: bool = False) -> dict:
     normalized = command.strip() if isinstance(command, str) else ""
 
     if normalized == "help":
@@ -620,96 +532,61 @@ async def cli(
         if target:
             result = _command_help_payload(target.strip())
             if result is None:
-                return {"status": "error", "error": {"code": "command_not_found", "message": f"Unknown command: {target}"}}
+                return {
+                    "status": "error",
+                    "interface": "cli",
+                    "version": "1.0",
+                    "error": {
+                        "code": "help_target_not_found",
+                        "message": f"Unknown help target: {target}",
+                    },
+                }
             return result
         return _catalog_payload()
 
     registry = _cli_command_registry()
     if normalized not in registry:
-        return {"status": "error", "error": {"code": "command_not_found", "message": f"Unknown command: {normalized}"}}
+        return {
+            "status": "error",
+            "interface": "cli",
+            "version": "1.0",
+            "error": {"code": "command_not_found", "message": f"Unknown command: {normalized}"},
+        }
 
-    tool_fn = registry[normalized]
-    try:
-        result = await tool_fn(context, **args)
-    except TypeError as exc:
-        return {"status": "error", "error": {"code": "invalid_arguments", "message": str(exc)}}
-
-    return {"status": "ok", "interface": "mcp-cli", "command": normalized, "args": args, "result": result}
-```
-
-**Key points:**
-
-- Calls `_cli_command_registry()` and the tool functions directly — no HTTP round-trip, no running server required
-- Passes the real `Context` object through — tools get progress notifications if they use it
-- `stream: bool` parameter is declared for schema completeness but streaming is not applicable via MCP (MCP tool results are single responses); direct clients should use `POST /api/cli` with `"stream": true` for NDJSON streaming
-- `help` and discovery work identically to the HTTP interface — same `_catalog_payload()` and `_command_help_payload()` functions
-
-**Claude Desktop config:**
-
-```json
-{
-  "mcpServers": {
-    "my-service": {
-      "url": "http://localhost:9000/mcp"
+    result = await registry[normalized](context, **args)
+    return {
+        "status": "ok",
+        "interface": "cli",
+        "version": "1.0",
+        "command": normalized,
+        "result": result,
     }
-  }
-}
 ```
-
-**What Claude Desktop sees in `tools/list`:**
-
-```json
-[
-  {
-    "name": "cli",
-    "description": "Invoke a service command interactively.\n\nStart with command='help' to discover...",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "command": {"type": "string"},
-        "args": {"type": "object"},
-        "stream": {"type": "boolean"}
-      },
-      "required": ["command"]
-    }
-  }
-]
-```
-
-One tool. Minimal context cost. Full surface accessible through `help`.
-
----
-
-### Summary: All three clients, one implementation
-
-```text
-Claude Desktop / MCP frameworks   →  MCP tool "cli"  ↘
-HTTP agents / LLM with HTTP tool  →  POST /api/cli   →  shared registry + tool functions
-LLM with bash / shell scripts     →  curl            ↗
-```
-
-The tool functions, registry, schema helpers, and catalog/help payloads are written once. All three client paths share them — no logic is duplicated.
 
 ---
 
 ## Things to Consider
 
-**Security** — a discoverable, agent-invokable command surface requires deliberate hardening. The more commands you expose, the larger the blast radius of a compromised or misbehaving agent. Treat this as a mandatory concern, not an afterthought:
+**Security**
 
-- **Authentication** — the `/api/cli` endpoint has no authentication by default. Sit behind a reverse proxy that enforces API keys, JWT, or mTLS before exposing remotely. Never expose the endpoint on a public network without auth.
-- **Authorization** — authentication tells you who the caller is; authorization controls what they can invoke. Scope tokens to the command groups an agent actually needs. An agent handling read-only catalog queries should not be able to invoke mutation or admin commands.
-- **Rate limiting** — agents can invoke commands in tight loops. Without rate limiting, a runaway agent or a prompt-injected instruction can exhaust downstream API quotas or trigger unintended bulk operations.
-- **Audit logging** — log every invocation with the caller identity, command name, arguments, and response status. At scale this is essential for diagnosing agent misbehavior and satisfying compliance requirements.
-- **Input validation** — validate all args before passing them to tools. Prompt injection via crafted argument values is a real vector when the caller is an LLM.
+- Add authentication before exposing `/api/cli` remotely
+- Enforce authorization by command group or capability
+- Add rate limits
+- Add audit logging
+- Validate all arguments before dispatch
 
-**Read vs write** — be deliberate about what goes in the CLI registry. A good default: if a tool modifies state, it does not belong in the CLI registry unless there is an explicit reason.
+**Read vs write**
 
-**Streaming defaults** — streaming is opt-in. For tools that routinely return hundreds of items, consider documenting expected sizes in the command summary so the LLM knows to request streaming.
+Start with read-oriented commands if you want the safest rollout, then add write commands intentionally where the agent use case justifies them.
 
-**Schema drift** — parameter enrichments (`_PARAMETER_ENRICHMENTS`) are maintained separately from the function signatures. When you rename a parameter or add a new one, update the enrichments too.
+**Schema drift**
 
-**`context` parameter** — tools that declare `context: Context` will receive `None` when called through the HTTP path. Do not rely on `context` inside tools that are also exposed via `/api/cli`. Use logging instead of `context.info()`.
+If parameter enrichments are maintained separately from function signatures, keep them in sync.
 
-**Semantic discovery** — at 20-30 tools the catalog is manageable. At 50+ tools, add a `semantic_find` command backed by vector search over tool metadata. Without it, the LLM must scan all summaries linearly.
+**Context handling**
 
-**Versioning** — if the tool surface changes significantly, consider a `version` field in the catalog payload. Agents that cache the catalog can detect when it is stale.
+If tools use an MCP `context`, remember HTTP callers may not have one.
+
+**Versioning**
+
+Include a `version` field in non-streaming responses so agents can detect contract changes.

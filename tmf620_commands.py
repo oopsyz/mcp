@@ -9,6 +9,14 @@ from tmf620_core import TMF620Client, TMF620Error
 Handler = Callable[[argparse.Namespace], Any]
 
 
+class CommandInvocationError(TMF620Error):
+    """CLI-facing invocation error with a machine-readable code."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
 class RichHelpFormatter(
     argparse.ArgumentDefaultsHelpFormatter, argparse.RawTextHelpFormatter
 ):
@@ -142,6 +150,23 @@ def _main_examples() -> list[str]:
 
 def _client(args: argparse.Namespace) -> TMF620Client:
     return TMF620Client(config_path=args.config)
+
+
+def _arg_dest(arg_spec: dict[str, Any]) -> str | None:
+    dest = arg_spec.get("dest")
+    if dest:
+        return dest
+    if "name" in arg_spec:
+        return arg_spec["name"]
+    if "flags" in arg_spec:
+        return arg_spec["flags"][-1].lstrip("-").replace("-", "_")
+    return None
+
+
+def _arg_required(arg_spec: dict[str, Any]) -> bool:
+    if "required" in arg_spec:
+        return bool(arg_spec["required"])
+    return "name" in arg_spec
 
 
 def _parse_filters(raw_filters: list[str] | None) -> dict[str, Any]:
@@ -587,22 +612,17 @@ def _action_schema(action: argparse.Action) -> dict[str, Any]:
 
     schema: dict[str, Any] = {
         "name": action.dest,
-        "kind": "option" if action.option_strings else "argument",
         "type": _action_type(action),
         "required": required,
-        "help": action.help,
+        "default": None,
     }
 
-    if action.option_strings:
-        schema["flags"] = list(action.option_strings)
-    if action.metavar is not None:
-        schema["metavar"] = action.metavar
-    if action.choices is not None:
-        schema["choices"] = list(action.choices)
     if action.default not in (None, argparse.SUPPRESS):
         schema["default"] = action.default
-    if action.nargs not in (None, 1):
-        schema["nargs"] = action.nargs
+    if action.help not in (None, argparse.SUPPRESS):
+        schema["description"] = action.help
+    if action.choices is not None:
+        schema["enum"] = list(action.choices)
     return schema
 
 
@@ -616,9 +636,19 @@ def _parser_examples(parser: argparse.ArgumentParser) -> list[str]:
     ]
 
 
+def _example_request_args(arguments: list[dict[str, Any]]) -> dict[str, Any]:
+    args: dict[str, Any] = {}
+    for argument in arguments:
+        if argument["required"]:
+            args[argument["name"]] = f"<{argument['name']}>"
+        elif argument["default"] not in (None, [], ""):
+            args[argument["name"]] = argument["default"]
+    return args
+
+
 def _parser_schema(parser: argparse.ArgumentParser) -> dict[str, Any]:
     schema: dict[str, Any] = {
-        "prog": parser.prog,
+        "summary": (parser.description or "").splitlines()[0] if parser.description else "",
         "description": parser.description,
         "examples": _parser_examples(parser),
         "arguments": [],
@@ -638,70 +668,62 @@ def _parser_schema(parser: argparse.ArgumentParser) -> dict[str, Any]:
     return schema
 
 
-def _compact_catalog_payload() -> dict[str, Any]:
-    commands: dict[str, Any] = {}
-    for node in COMMAND_TREE:
-        if node["kind"] == "command":
-            commands[node["name"]] = node["help"]
-            continue
-        commands[node["name"]] = [child["name"] for child in node["commands"]]
-
-    return {
-        "status": "ok",
-        "service": "tmf620",
-        "interface": "commands",
-        "mode": "compact",
-        "usage": {
-            "catalog": "GET /api/cli",
-            "command_help": 'POST /api/cli {"command":"help","args":{"command":"<command path>"}}',
-            "invoke": 'POST /api/cli {"command":"<command path>","args":{...}}',
-        },
-        "global_options": ["config", "output"],
-        "commands": commands,
-    }
+def _command_identity(path: list[str]) -> str:
+    return " ".join(path)
 
 
-def _verbose_catalog_payload(parser: argparse.ArgumentParser) -> dict[str, Any]:
+def _catalog_entries() -> list[dict[str, Any]]:
     commands: list[dict[str, Any]] = []
     for node in COMMAND_TREE:
-        entry = {
-            "name": node["name"],
-            "kind": node["kind"],
-            "summary": node["help"],
-        }
-        if node["kind"] == "group":
-            entry["subcommands"] = [
-                {"name": child["name"], "summary": child["help"]}
-                for child in node["commands"]
-            ]
-        commands.append(entry)
-
-    return {
-        "status": "ok",
-        "service": "tmf620",
-        "interface": "commands",
-        "description": parser.description,
-        "usage": {
-            "catalog": "GET /api/cli",
-            "command_help": 'POST /api/cli {"command":"help","args":{"command":"<command path>"}}',
-            "invoke": 'POST /api/cli {"command":"<command path>","args":{...}}',
-        },
-        "global_options": [
-            _action_schema(action)
-            for action in parser._actions
-            if action.option_strings and _action_schema(action)
-        ],
-        "examples": _main_examples(),
-        "commands": commands,
-    }
+        commands.append(
+            {
+                "name": node["name"],
+                "kind": node["kind"],
+                "summary": node["help"],
+            }
+        )
+    return commands
 
 
 def _catalog_payload(
     parser: argparse.ArgumentParser, *, verbose: bool = False
 ) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "status": "ok",
+        "interface": "cli",
+        "version": "1.0",
+        "service": "tmf620",
+        "how_to_invoke": {
+            "endpoint": "POST /api/cli",
+            "shape": {"command": "<command_name>", "args": {}, "stream": False},
+        },
+        "how_to_get_help": {
+            "all_commands": 'GET /api/cli or POST /api/cli {"command":"help"}',
+            "one_command": 'POST /api/cli {"command":"help","args":{"command":"<command path>"}}',
+        },
+        "commands": _catalog_entries(),
+        "total": len(COMMAND_TREE),
+    }
     if verbose:
-        return _verbose_catalog_payload(parser)
-    return _compact_catalog_payload()
+        payload["description"] = parser.description
+        payload["examples"] = _main_examples()
+    return payload
+
+
+def _find_group_node(path: list[str]) -> dict[str, Any] | None:
+    current_nodes = COMMAND_TREE
+    node: dict[str, Any] | None = None
+    for token in path:
+        node = next(
+            (candidate for candidate in current_nodes if candidate["name"] == token),
+            None,
+        )
+        if node is None:
+            return None
+        current_nodes = node.get("commands", [])
+    if node is None or node["kind"] != "group":
+        return None
+    return node
 
 
 def _command_payload(
@@ -719,57 +741,54 @@ def _command_payload(
 
         return {
             "status": "ok",
-            "service": "tmf620",
-            "interface": "commands",
-            "mode": "detailed",
-            "command": " ".join(path),
-            "schema": current,
-        }
-
-    if not verbose:
-        current_nodes = COMMAND_TREE
-        current_group: dict[str, Any] | None = None
-        for token in path:
-            current_group = next(
-                (candidate for candidate in current_nodes if candidate["name"] == token),
-                None,
-            )
-            if current_group is None:
-                return None
-            current_nodes = current_group.get("commands", [])
-
-        if current_group is None or current_group["kind"] != "group":
-            return None
-
-        return {
-            "status": "ok",
-            "service": "tmf620",
-            "interface": "commands",
-            "mode": "compact",
-            "command": " ".join(path),
-            "summary": current_group["help"],
-            "description": current_group["description"],
-            "subcommands": [
-                {"name": child["name"], "summary": child["help"]}
-                for child in current_group["commands"]
+            "interface": "cli",
+            "version": "1.0",
+            "command": _command_identity(path),
+            "summary": node["help"],
+            "description": current["description"],
+            "arguments": current["arguments"],
+            "examples": [
+                {
+                    "description": f"Invoke {_command_identity(path)}",
+                    "request": {
+                        "command": _command_identity(path),
+                        "args": _example_request_args(current["arguments"]),
+                    },
+                },
+                *[
+                    {
+                        "description": f"Shell example for {_command_identity(path)}",
+                        "request": {
+                            "command": _command_identity(path),
+                            "args": _example_request_args(current["arguments"]),
+                        },
+                        "shell": example,
+                    }
+                    for example in current["examples"]
+                ],
             ],
         }
 
-    schema = _parser_schema(parser)
-    current = schema
-
-    for token in path:
-        current = current["subcommands"].get(token)
-        if current is None:
-            return None
+    current_group = _find_group_node(path)
+    if current_group is None:
+        return None
 
     return {
         "status": "ok",
-        "service": "tmf620",
-        "interface": "commands",
-        "mode": "detailed",
-        "command": " ".join(path),
-        "schema": current,
+        "interface": "cli",
+        "version": "1.0",
+        "command": _command_identity(path),
+        "kind": "group",
+        "summary": current_group["help"],
+        "description": current_group["description"],
+        "subcommands": [
+            {
+                "name": child["name"],
+                "kind": child["kind"],
+                "summary": child["help"],
+            }
+            for child in current_group["commands"]
+        ],
     }
 
 
@@ -793,22 +812,17 @@ def invoke_command(
 ) -> Any:
     path = _split_command_path(command)
     if not path:
-        raise TMF620Error("Command cannot be empty.")
+        raise CommandInvocationError("invalid_command", "Command cannot be empty.")
 
     node = _find_command_node(path)
     if node is None:
-        raise TMF620Error(f"Unknown command path: {command}")
+        raise CommandInvocationError("command_not_found", f"Unknown command: {command}")
 
     namespace_data: dict[str, Any] = {"config": config_path, "output": output}
     namespace_data.update(node["defaults"])
 
     for arg_spec in node["args"]:
-        dest = arg_spec.get("dest")
-        if not dest:
-            if "name" in arg_spec:
-                dest = arg_spec["name"]
-            elif "flags" in arg_spec:
-                dest = arg_spec["flags"][-1].lstrip("-").replace("-", "_")
+        dest = _arg_dest(arg_spec)
         if not dest:
             continue
 
@@ -832,24 +846,35 @@ def invoke_command(
     if "body_file" in provided_args:
         namespace_data["body_file"] = provided_args.pop("body_file")
 
+    expected_args = {"body", "body_json", "body_file"}
+    for arg_spec in node["args"]:
+        dest = _arg_dest(arg_spec)
+        if dest:
+            expected_args.add(dest)
+
+    unexpected_args = sorted(key for key in provided_args if key not in expected_args)
+    if unexpected_args:
+        raise CommandInvocationError(
+            "invalid_argument",
+            f"Unknown argument(s): {', '.join(unexpected_args)}",
+        )
+
     for key, value in provided_args.items():
         namespace_data[key] = value
 
     missing_required: list[str] = []
     for arg_spec in node["args"]:
-        dest = arg_spec.get("dest")
-        if not dest:
-            if "name" in arg_spec:
-                dest = arg_spec["name"]
-            elif "flags" in arg_spec:
-                dest = arg_spec["flags"][-1].lstrip("-").replace("-", "_")
+        dest = _arg_dest(arg_spec)
         if not dest:
             continue
-        if arg_spec.get("required") and namespace_data.get(dest) in (None, ""):
+        if _arg_required(arg_spec) and namespace_data.get(dest) in (None, ""):
             missing_required.append(dest)
 
     if missing_required:
-        raise TMF620Error(f"Missing required arguments: {', '.join(missing_required)}")
+        raise CommandInvocationError(
+            "missing_required_argument",
+            f"Missing required arguments: {', '.join(missing_required)}",
+        )
 
     args_ns = argparse.Namespace(**namespace_data)
     return node["handler"](args_ns)

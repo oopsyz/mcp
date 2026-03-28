@@ -9,6 +9,7 @@ services:
     environment:
       - TMF620_API_URL=http://localhost:8801/tmf-api/productCatalogManagement/v5
       - MCP_PORT=7701
+      - MCP_HOST=0.0.0.0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7701/health"]
       interval: 30s

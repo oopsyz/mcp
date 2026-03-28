@@ -13,6 +13,7 @@ from starlette.responses import JSONResponse, StreamingResponse
 
 from tmf620_commands import (
     COMMAND_TREE,
+    CommandInvocationError,
     get_catalog_payload,
     get_command_help_payload,
     invoke_command,
@@ -233,60 +234,57 @@ def _register_mcp_command_routes() -> None:
             )
 
 
-def _json_error(status_code: int, code: str, message: str) -> JSONResponse:
+def _json_error(
+    status_code: int,
+    code: str,
+    message: str,
+    *,
+    retryable: bool | None = None,
+    suggestions: list[str] | None = None,
+    next_actions: list[dict[str, Any]] | None = None,
+) -> JSONResponse:
+    error: dict[str, Any] = {"code": code, "message": message}
+    if retryable is not None:
+        error["retryable"] = retryable
+    if suggestions:
+        error["suggestions"] = suggestions
+    if next_actions:
+        error["next_actions"] = next_actions
     return JSONResponse(
         status_code=status_code,
-        content={"status": "error", "error": {"code": code, "message": message}},
+        content={
+            "status": "error",
+            "interface": "cli",
+            "version": "1.0",
+            "error": error,
+        },
     )
 
 
 def _streaming_result_chunks(command: str, args: dict[str, Any], result: Any):
     yield json.dumps(
         {
-            "status": "ok",
             "type": "started",
             "command": command,
-            "args": args,
-            "timestamp": _now(),
+            "interface": "cli",
+            "version": "1.0",
         }
     ) + "\n"
 
     if isinstance(result, list):
         for item in result:
-            yield json.dumps({"status": "ok", "type": "item", "item": item}) + "\n"
-        yield json.dumps(
-            {
-                "status": "ok",
-                "type": "done",
-                "total": len(result),
-                "result_kind": "items",
-            }
-        ) + "\n"
+            yield json.dumps({"type": "item", "data": item}) + "\n"
+        yield json.dumps({"type": "done", "command": command, "total": len(result)}) + "\n"
         return
 
     if isinstance(result, dict) and isinstance(result.get("items"), list):
         for item in result["items"]:
-            yield json.dumps({"status": "ok", "type": "item", "item": item}) + "\n"
+            yield json.dumps({"type": "item", "data": item}) + "\n"
         metadata = {key: value for key, value in result.items() if key != "items"}
-        yield json.dumps(
-            {
-                "status": "ok",
-                "type": "done",
-                "total": len(result["items"]),
-                "result_kind": "items",
-                "metadata": metadata,
-            }
-        ) + "\n"
+        yield json.dumps({"type": "done", "command": command, "total": len(result["items"]), **metadata}) + "\n"
         return
 
-    yield json.dumps({"status": "ok", "type": "result", "result": result}) + "\n"
-    yield json.dumps(
-        {
-            "status": "ok",
-            "type": "done",
-            "result_kind": "single",
-        }
-    ) + "\n"
+    yield json.dumps({"type": "result", "command": command, "data": result}) + "\n"
 
 
 @asynccontextmanager
@@ -349,19 +347,26 @@ async def cli_dispatch(request: Request):
     if not isinstance(args, dict):
         return _json_error(400, "invalid_arguments", "args must be a JSON object.")
 
-    stream = bool(payload.get("stream", False))
+    stream = payload.get("stream", False)
+    if not isinstance(stream, bool):
+        return _json_error(400, "invalid_request", "stream must be a boolean.")
+
     normalized_command = command.strip()
 
     if normalized_command == "help":
         target = args.get("command")
-        verbose = bool(args.get("verbose", False))
         if target is None:
-            return get_catalog_payload(verbose=verbose)
+            return get_catalog_payload()
         if not isinstance(target, str) or not target.strip():
             return _json_error(400, "invalid_arguments", "help args.command must be a non-empty string.")
-        help_payload = get_command_help_payload(target.strip(), verbose=verbose)
+        help_payload = get_command_help_payload(target.strip())
         if help_payload is None:
-            return _json_error(404, "command_not_found", f"Unknown command: {target}")
+            return _json_error(
+                404,
+                "help_target_not_found",
+                f"Unknown help target: {target}",
+                next_actions=[{"type": "help", "request": {"command": "help"}}],
+            )
         return help_payload
 
     try:
@@ -372,11 +377,24 @@ async def cli_dispatch(request: Request):
             config_path=None,
             output="json",
         )
+    except CommandInvocationError as exc:
+        status_code = 404 if exc.code in {"command_not_found"} else 400
+        next_actions: list[dict[str, Any]] | None = None
+        if exc.code == "command_not_found":
+            next_actions = [{"type": "help", "request": {"command": "help"}}]
+        elif exc.code in {"missing_required_argument", "invalid_argument"}:
+            next_actions = [
+                {
+                    "type": "help",
+                    "request": {
+                        "command": "help",
+                        "args": {"command": normalized_command},
+                    },
+                }
+            ]
+        return _json_error(status_code, exc.code, str(exc), next_actions=next_actions)
     except TMF620Error as exc:
-        message = str(exc)
-        status_code = 404 if message.startswith("Unknown command path:") else 500
-        code = "command_not_found" if status_code == 404 else "tool_invocation_failed"
-        return _json_error(status_code, code, message)
+        return _json_error(500, "tool_invocation_failed", str(exc))
     except TypeError as exc:
         return _json_error(400, "invalid_arguments", str(exc))
     except Exception as exc:
@@ -391,10 +409,9 @@ async def cli_dispatch(request: Request):
 
     return {
         "status": "ok",
-        "service": "tmf620",
-        "interface": "cli-http",
+        "interface": "cli",
+        "version": "1.0",
         "command": normalized_command,
-        "args": args,
         "result": result,
     }
 
