@@ -410,6 +410,77 @@ def streaming_response():
     assert last["type"] in ("result", "done")
 
 
+def mcp_route_valid_call():
+    data = _curl_post("http://localhost:7701/commands/health", {"args": {}})
+    assert isinstance(data, dict)
+    assert data["status"] == "healthy"
+
+
+def mcp_route_unknown_arg():
+    rc, data = _curl_post_raw(
+        "http://localhost:7701/commands/health", {"args": {"bogus": 1}}
+    )
+    assert data["status"] == "error"
+    assert data["error"]["code"] == "invalid_argument"
+
+
+def mcp_route_missing_required_arg():
+    rc, data = _curl_post_raw(
+        "http://localhost:7701/commands/catalog/get", {"args": {}}
+    )
+    assert data["status"] == "error"
+    assert data["error"]["code"] == "missing_required_argument"
+
+
+def mcp_route_list_with_limit():
+    data = _curl_post(
+        "http://localhost:7701/commands/catalog/list", {"args": {"limit": 1}}
+    )
+    assert isinstance(data, list)
+    assert len(data) <= 1
+
+
+def mcp_route_get_by_id():
+    data = _curl_post(
+        "http://localhost:7701/commands/catalog/get",
+        {"args": {"catalog_id": "cat-001"}},
+    )
+    assert data["id"] == "cat-001"
+
+
+def mcp_route_offering_list():
+    data = _curl_post("http://localhost:7701/commands/offering/list", {"args": {}})
+    assert isinstance(data, list)
+    assert len(data) >= 1
+
+
+def mcp_route_create_and_delete():
+    data = _curl_post(
+        "http://localhost:7701/commands/category/create",
+        {
+            "args": {
+                "body": {
+                    "name": "MCP Test Category",
+                    "@type": "Category",
+                }
+            }
+        },
+    )
+    assert data["name"] == "MCP Test Category"
+    cat_id = data["id"]
+
+    get = _curl_post(
+        f"http://localhost:7701/commands/category/get",
+        {"args": {"category_id": cat_id}},
+    )
+    assert get["name"] == "MCP Test Category"
+
+    _curl_post(
+        f"http://localhost:7701/commands/category/delete",
+        {"args": {"category_id": cat_id}},
+    )
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("CLI API Test Suite")
@@ -463,6 +534,18 @@ if __name__ == "__main__":
 
     print("\n-- Streaming --")
     test("streaming response returns NDJSON", streaming_response)
+
+    print("\n-- MCP Routes --")
+    test("MCP health route returns healthy", mcp_route_valid_call)
+    test("MCP health route rejects unknown arg", mcp_route_unknown_arg)
+    test(
+        "MCP catalog get route rejects missing required arg",
+        mcp_route_missing_required_arg,
+    )
+    test("MCP catalog list route supports limit", mcp_route_list_with_limit)
+    test("MCP catalog get route returns by id", mcp_route_get_by_id)
+    test("MCP offering list route returns offerings", mcp_route_offering_list)
+    test("MCP category create/get/delete lifecycle", mcp_route_create_and_delete)
 
     print("\n-- Error Handling --")
     test("empty command returns error", empty_command)

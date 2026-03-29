@@ -110,6 +110,47 @@ def _find_command_node(command_path: list[str]) -> dict[str, Any] | None:
     return node
 
 
+def _validate_command_args(command_path: list[str], args: dict[str, Any]) -> None:
+    from tmf620_commands import (
+        _find_command_node,
+        _arg_dest,
+        _arg_required,
+        CommandInvocationError,
+    )
+
+    node = _find_command_node(command_path)
+    if node is None:
+        return
+
+    expected: set[str] = set()
+    for arg_spec in node["args"]:
+        dest = _arg_dest(arg_spec)
+        if dest:
+            expected.add(dest)
+    expected.update({"body", "body_json", "body_file"})
+
+    unexpected = sorted(key for key in args if key not in expected)
+    if unexpected:
+        raise CommandInvocationError(
+            "invalid_argument",
+            f"Unknown argument(s): {', '.join(unexpected)}",
+        )
+
+    missing: list[str] = []
+    for arg_spec in node["args"]:
+        dest = _arg_dest(arg_spec)
+        if not dest:
+            continue
+        if _arg_required(arg_spec) and args.get(dest) in (None, ""):
+            missing.append(dest)
+
+    if missing:
+        raise CommandInvocationError(
+            "missing_required_argument",
+            f"Missing required arguments: {', '.join(missing)}",
+        )
+
+
 def _register_command_route(
     *,
     command_path: list[str],
@@ -122,11 +163,34 @@ def _register_command_route(
 
     async def endpoint(request: CommandArgsRequest):
         try:
+            _validate_command_args(command_path, request.args)
             return await asyncio.to_thread(handler, request.args)
+        except CommandInvocationError as exc:
+            status_code = 404 if exc.code == "command_not_found" else 400
+            next_actions = None
+            if exc.code in {"missing_required_argument", "invalid_argument"}:
+                next_actions = [
+                    {
+                        "type": "help",
+                        "request": {
+                            "command": "help",
+                            "args": {"command": _command_path_tokens(command_path)},
+                        },
+                    }
+                ]
+            return _json_error(
+                status_code,
+                exc.code,
+                str(exc),
+                next_actions=next_actions,
+            )
         except TMF620Error as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
+            return _json_error(500, "tool_invocation_failed", str(exc))
         except TypeError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            return _json_error(400, "invalid_arguments", str(exc))
+        except Exception as exc:
+            logger.exception("Unexpected command route failure")
+            return _json_error(500, "tool_invocation_failed", str(exc))
 
     endpoint.__name__ = operation_id
     app.add_api_route(
@@ -262,26 +326,42 @@ def _json_error(
 
 
 def _streaming_result_chunks(command: str, args: dict[str, Any], result: Any):
-    yield json.dumps(
-        {
-            "type": "started",
-            "command": command,
-            "interface": "cli",
-            "version": "1.0",
-        }
-    ) + "\n"
+    yield (
+        json.dumps(
+            {
+                "type": "started",
+                "command": command,
+                "interface": "cli",
+                "version": "1.0",
+            }
+        )
+        + "\n"
+    )
 
     if isinstance(result, list):
         for item in result:
             yield json.dumps({"type": "item", "data": item}) + "\n"
-        yield json.dumps({"type": "done", "command": command, "total": len(result)}) + "\n"
+        yield (
+            json.dumps({"type": "done", "command": command, "total": len(result)})
+            + "\n"
+        )
         return
 
     if isinstance(result, dict) and isinstance(result.get("items"), list):
         for item in result["items"]:
             yield json.dumps({"type": "item", "data": item}) + "\n"
         metadata = {key: value for key, value in result.items() if key != "items"}
-        yield json.dumps({"type": "done", "command": command, "total": len(result["items"]), **metadata}) + "\n"
+        yield (
+            json.dumps(
+                {
+                    "type": "done",
+                    "command": command,
+                    "total": len(result["items"]),
+                    **metadata,
+                }
+            )
+            + "\n"
+        )
         return
 
     yield json.dumps({"type": "result", "command": command, "data": result}) + "\n"
@@ -337,11 +417,15 @@ async def cli_dispatch(request: Request):
         return _json_error(400, "invalid_json", "Request body must be valid JSON.")
 
     if not isinstance(payload, dict):
-        return _json_error(400, "invalid_request", "Request body must be a JSON object.")
+        return _json_error(
+            400, "invalid_request", "Request body must be a JSON object."
+        )
 
     command = payload.get("command")
     if not isinstance(command, str) or not command.strip():
-        return _json_error(400, "invalid_command", "Command must be a non-empty string.")
+        return _json_error(
+            400, "invalid_command", "Command must be a non-empty string."
+        )
 
     args = payload.get("args", {})
     if not isinstance(args, dict):
@@ -358,7 +442,11 @@ async def cli_dispatch(request: Request):
         if target is None:
             return get_catalog_payload()
         if not isinstance(target, str) or not target.strip():
-            return _json_error(400, "invalid_arguments", "help args.command must be a non-empty string.")
+            return _json_error(
+                400,
+                "invalid_arguments",
+                "help args.command must be a non-empty string.",
+            )
         help_payload = get_command_help_payload(target.strip())
         if help_payload is None:
             return _json_error(
@@ -426,21 +514,31 @@ async def get_catalog_endpoint(catalog_id: str):
     return await asyncio.to_thread(_safe_call, _get_client().get_catalog, catalog_id)
 
 
-@app.get("/product-offerings", operation_id="list_product_offerings", include_in_schema=False)
+@app.get(
+    "/product-offerings", operation_id="list_product_offerings", include_in_schema=False
+)
 async def list_product_offerings_endpoint(catalog_id: Optional[str] = None):
     return await asyncio.to_thread(
         _safe_call, _get_client().list_product_offerings, catalog_id
     )
 
 
-@app.get("/product-offerings/{offering_id}", operation_id="get_product_offering", include_in_schema=False)
+@app.get(
+    "/product-offerings/{offering_id}",
+    operation_id="get_product_offering",
+    include_in_schema=False,
+)
 async def get_product_offering_endpoint(offering_id: str):
     return await asyncio.to_thread(
         _safe_call, _get_client().get_product_offering, offering_id
     )
 
 
-@app.post("/product-offerings", operation_id="create_product_offering", include_in_schema=False)
+@app.post(
+    "/product-offerings",
+    operation_id="create_product_offering",
+    include_in_schema=False,
+)
 async def create_product_offering_endpoint(request: ProductOfferingRequest):
     return await asyncio.to_thread(
         _safe_call,
@@ -451,9 +549,15 @@ async def create_product_offering_endpoint(request: ProductOfferingRequest):
     )
 
 
-@app.get("/product-specifications", operation_id="list_product_specifications", include_in_schema=False)
+@app.get(
+    "/product-specifications",
+    operation_id="list_product_specifications",
+    include_in_schema=False,
+)
 async def list_product_specifications_endpoint():
-    return await asyncio.to_thread(_safe_call, _get_client().list_product_specifications)
+    return await asyncio.to_thread(
+        _safe_call, _get_client().list_product_specifications
+    )
 
 
 @app.get(
@@ -467,7 +571,11 @@ async def get_product_specification_endpoint(specification_id: str):
     )
 
 
-@app.post("/product-specifications", operation_id="create_product_specification", include_in_schema=False)
+@app.post(
+    "/product-specifications",
+    operation_id="create_product_specification",
+    include_in_schema=False,
+)
 async def create_product_specification_endpoint(request: ProductSpecificationRequest):
     return await asyncio.to_thread(
         _safe_call,
@@ -478,7 +586,9 @@ async def create_product_specification_endpoint(request: ProductSpecificationReq
     )
 
 
-@app.get("/server-config", operation_id="compat_get_server_config", include_in_schema=False)
+@app.get(
+    "/server-config", operation_id="compat_get_server_config", include_in_schema=False
+)
 async def server_config():
     resolved_config = _get_client().config
     return {

@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import statistics
+import subprocess
+import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +15,176 @@ import tiktoken
 from tmf620_commands import COMMAND_TREE, get_catalog_payload, get_command_help_payload
 
 
+BASE = "http://localhost:7701"
+CLI_URL = f"{BASE}/api/cli"
 DEFAULT_ENCODING = "cl100k_base"
+DEFAULT_ITERATIONS = 50
+
+
+def _post(url: str, payload: dict[str, Any], *, allow_error: bool = False) -> float:
+    start = time.perf_counter()
+    cmd = [
+        "curl",
+        "-s",
+        "-X",
+        "POST",
+        url,
+        "-H",
+        "Content-Type: application/json",
+        "-d",
+        json.dumps(payload),
+    ]
+    if not allow_error:
+        cmd.insert(1, "-f")
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    elapsed = time.perf_counter() - start
+    if not allow_error:
+        assert r.returncode == 0, f"curl failed: {r.stderr}"
+    return elapsed
+
+
+def run_latency_benchmark(iterations: int = DEFAULT_ITERATIONS) -> dict[str, list[float]]:
+    results: dict[str, list[float]] = {}
+
+    def _bench(
+        label: str,
+        url: str,
+        payload: dict[str, Any],
+        *,
+        allow_error: bool = False,
+    ) -> None:
+        print(f"  {label} ({iterations} calls)...", end=" ", flush=True)
+        latencies: list[float] = []
+        for _ in range(iterations):
+            t = _post(url, payload, allow_error=allow_error)
+            latencies.append(t)
+        results[label] = latencies
+        mean = statistics.mean(latencies) * 1000
+        med = statistics.median(latencies) * 1000
+        p95_index = max(0, math.ceil(0.95 * len(latencies)) - 1)
+        p95 = sorted(latencies)[p95_index] * 1000
+        print(f"mean={mean:.1f}ms  median={med:.1f}ms  p95={p95:.1f}ms")
+
+    def _print_comparison(cli_label: str, mcp_label: str) -> None:
+        cli_ms = statistics.mean(results[cli_label]) * 1000
+        mcp_ms = statistics.mean(results[mcp_label]) * 1000
+        if cli_ms < mcp_ms:
+            print(f"    --> CLI is {mcp_ms / cli_ms:.2f}x faster")
+        else:
+            print(f"    --> MCP is {cli_ms / mcp_ms:.2f}x faster")
+
+    print("=" * 70)
+    print(f"CLI vs MCP Benchmark  ({iterations} iterations per test)")
+    print("=" * 70)
+
+    print("\n-- catalog list --")
+    _bench("cli: catalog list", CLI_URL, {"command": "catalog list"})
+    _bench("mcp: catalog list", f"{BASE}/commands/catalog/list", {"args": {}})
+    _print_comparison("cli: catalog list", "mcp: catalog list")
+
+    print("\n-- catalog get --")
+    _bench(
+        "cli: catalog get",
+        CLI_URL,
+        {"command": "catalog get", "args": {"catalog_id": "cat-001"}},
+    )
+    _bench(
+        "mcp: catalog get",
+        f"{BASE}/commands/catalog/get",
+        {"args": {"catalog_id": "cat-001"}},
+    )
+    _print_comparison("cli: catalog get", "mcp: catalog get")
+
+    print("\n-- offering list --")
+    _bench("cli: offering list", CLI_URL, {"command": "offering list"})
+    _bench("mcp: offering list", f"{BASE}/commands/offering/list", {"args": {}})
+    _print_comparison("cli: offering list", "mcp: offering list")
+
+    print("\n-- offering get --")
+    _bench(
+        "cli: offering get",
+        CLI_URL,
+        {"command": "offering get", "args": {"offering_id": "po-001"}},
+    )
+    _bench(
+        "mcp: offering get",
+        f"{BASE}/commands/offering/get",
+        {"args": {"offering_id": "po-001"}},
+    )
+    _print_comparison("cli: offering get", "mcp: offering get")
+
+    print("\n-- category list --")
+    _bench("cli: category list", CLI_URL, {"command": "category list"})
+    _bench("mcp: category list", f"{BASE}/commands/category/list", {"args": {}})
+    _print_comparison("cli: category list", "mcp: category list")
+
+    print("\n-- specification list --")
+    _bench("cli: spec list", CLI_URL, {"command": "specification list"})
+    _bench("mcp: spec list", f"{BASE}/commands/specification/list", {"args": {}})
+    _print_comparison("cli: spec list", "mcp: spec list")
+
+    print("\n-- price list --")
+    _bench("cli: price list", CLI_URL, {"command": "price list"})
+    _bench("mcp: price list", f"{BASE}/commands/price/list", {"args": {}})
+    _print_comparison("cli: price list", "mcp: price list")
+
+    print("\n-- health --")
+    _bench("cli: health", CLI_URL, {"command": "health"})
+    _bench("mcp: health", f"{BASE}/commands/health", {"args": {}})
+    _print_comparison("cli: health", "mcp: health")
+
+    print("\n-- config --")
+    _bench("cli: config", CLI_URL, {"command": "config"})
+    _bench("mcp: config", f"{BASE}/commands/config", {"args": {}})
+    _print_comparison("cli: config", "mcp: config")
+
+    print("\n-- validation error (missing arg) --")
+    _bench(
+        "cli: err missing arg",
+        CLI_URL,
+        {"command": "catalog get"},
+        allow_error=True,
+    )
+    _bench(
+        "mcp: err missing arg",
+        f"{BASE}/commands/catalog/get",
+        {"args": {}},
+        allow_error=True,
+    )
+    _print_comparison("cli: err missing arg", "mcp: err missing arg")
+
+    print("\n-- validation error (unknown arg) --")
+    _bench(
+        "cli: err unknown arg",
+        CLI_URL,
+        {"command": "health", "args": {"bogus": 1}},
+        allow_error=True,
+    )
+    _bench(
+        "mcp: err unknown arg",
+        f"{BASE}/commands/health",
+        {"args": {"bogus": 1}},
+        allow_error=True,
+    )
+    _print_comparison("cli: err unknown arg", "mcp: err unknown arg")
+
+    print("\n" + "=" * 70)
+    print("Summary (mean ms)")
+    print("-" * 70)
+    print(f"{'Test':<30s} {'CLI':>8s} {'MCP':>8s} {'Ratio':>8s}")
+    print("-" * 70)
+    cli_tests = [k for k in results if k.startswith("cli:")]
+    for cli_key in cli_tests:
+        mcp_key = cli_key.replace("cli:", "mcp:")
+        if mcp_key not in results:
+            continue
+        cli_ms = statistics.mean(results[cli_key]) * 1000
+        mcp_ms = statistics.mean(results[mcp_key]) * 1000
+        ratio = mcp_ms / cli_ms if cli_ms > 0 else 0
+        label = cli_key.replace("cli: ", "")
+        print(f"{label:<30s} {cli_ms:>7.1f}ms {mcp_ms:>7.1f}ms {ratio:>7.2f}x")
+    print("=" * 70)
+    return results
 
 
 def _dump(payload: Any) -> str:
@@ -139,9 +313,11 @@ def build_report(encoding_name: str = DEFAULT_ENCODING) -> dict[str, Any]:
                 "tokens": leaf_tokens,
             },
             "progressive_catalog_plus_group": {
+                "chars": compact_catalog_chars + compact_group_chars,
                 "tokens": compact_catalog_tokens + compact_group_tokens,
             },
             "progressive_catalog_plus_group_plus_leaf": {
+                "chars": compact_catalog_chars + compact_group_chars + leaf_chars,
                 "tokens": compact_catalog_tokens + compact_group_tokens + leaf_tokens,
             },
         },
@@ -236,7 +412,7 @@ def _format_compare_table(compare: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def main() -> None:
+def main_token(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Compare token usage for the compact HTTP CLI discovery flow versus "
@@ -258,7 +434,7 @@ def main() -> None:
         "--baseline",
         help="Optional path to a previous JSON report to compare against.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     report = build_report(args.encoding)
     if args.baseline:
@@ -282,5 +458,62 @@ def main() -> None:
     print(json.dumps(report, indent=2))
 
 
+def main_latency(argv: list[str] | None = None) -> None:
+    iterations = int(argv[0]) if argv else DEFAULT_ITERATIONS
+    run_latency_benchmark(iterations)
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Run the TMF620 benchmark suite."
+    )
+    subparsers = parser.add_subparsers(dest="mode", required=True)
+
+    token_parser = subparsers.add_parser("token", help="Run the token benchmark")
+    token_parser.add_argument(
+        "--encoding",
+        default=DEFAULT_ENCODING,
+        help=f"Tokenizer encoding name to use. Default: {DEFAULT_ENCODING}.",
+    )
+    token_parser.add_argument(
+        "--output",
+        choices=("json", "pretty"),
+        default="pretty",
+        help="Output format.",
+    )
+    token_parser.add_argument(
+        "--baseline",
+        help="Optional path to a previous JSON report to compare against.",
+    )
+
+    latency_parser = subparsers.add_parser(
+        "latency", help="Run the latency benchmark"
+    )
+    latency_parser.add_argument(
+        "iterations",
+        nargs="?",
+        type=int,
+        default=DEFAULT_ITERATIONS,
+        help=f"Number of iterations per test. Default: {DEFAULT_ITERATIONS}.",
+    )
+
+    args = parser.parse_args(argv)
+
+    if args.mode == "token":
+        token_args: list[str] = []
+        if args.encoding != DEFAULT_ENCODING:
+            token_args.extend(["--encoding", args.encoding])
+        if args.output != "pretty":
+            token_args.extend(["--output", args.output])
+        if args.baseline:
+            token_args.extend(["--baseline", args.baseline])
+        main_token(token_args)
+        return
+
+    if args.mode == "latency":
+        main_latency([str(args.iterations)])
+        return
+
+
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
