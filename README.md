@@ -14,14 +14,14 @@ The practical reasons are:
 
 The current benchmark numbers are:
 
-- MCP tool surface: `38` generated command tools, plus `2` compatibility tools in this repo's adapter
-- raw MCP discovery payload: `3,393` tokens
-- OpenAI-wrapped MCP tool payload: `3,735` tokens
-- compact `GET /api/cli`: `189` tokens
-- compact group help: `105` tokens
-- leaf help: `218` tokens
-- compact catalog + group help: `294` tokens
-- compact catalog + group help + leaf help: `512` tokens
+- MCP tool surface: `37` generated command tools
+- raw MCP discovery payload: `2,992` tokens
+- OpenAI-wrapped MCP tool payload: `3,325` tokens
+- compact `GET /api/cli`: `254` tokens
+- compact group help: `125` tokens
+- leaf help: `245` tokens
+- compact catalog + group help: `379` tokens
+- compact catalog + group help + leaf help: `624` tokens
 
 That matters because many agent runtimes resend the tool list on each model call or session turn. In that common pattern, a large MCP tool surface becomes repeated context cost. Compact CLI discovery avoids paying for every tool up front and instead expands only the branch the agent needs.
 
@@ -354,8 +354,8 @@ curl http://localhost:7701/health
 Use the built-in benchmark to compare the compact HTTP CLI discovery flow against the MCP tool payload exposed by this repo:
 
 ```bash
-uv run tmf620-token-benchmark
-uv run tmf620-token-benchmark --output json
+uv run tmf620-benchmark token
+uv run tmf620-benchmark token --output json
 ```
 
 The benchmark does not require the mock API or MCP server to be running. It measures the live local code:
@@ -373,4 +373,4 @@ Console scripts exposed by `pyproject.toml`:
 
 - `tmf620-mock-server`
 - `tmf620-mcp-server`
-- `tmf620-token-benchmark`
+- `tmf620-benchmark`

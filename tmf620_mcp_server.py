@@ -2,14 +2,15 @@ import asyncio
 import datetime
 import json
 import logging
+import textwrap
 from contextlib import asynccontextmanager
-from typing import Any, Optional
+from typing import Any, Annotated, Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi_mcp import FastApiMCP
 from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse, StreamingResponse
+from mcp.server.fastmcp import FastMCP
 
 from tmf620_commands import (
     COMMAND_TREE,
@@ -33,6 +34,7 @@ logger = logging.getLogger("tmf620-mcp")
 
 config: Optional[dict[str, Any]] = None
 client: Optional[TMF620Client] = None
+mcp_session_manager: Any = None
 
 
 class ProductOfferingRequest(BaseModel):
@@ -53,20 +55,6 @@ class ApiResponse(BaseModel):
     timestamp: Optional[str] = None
 
 
-class CliRequest(BaseModel):
-    command: str
-    args: dict[str, Any] = {}
-    stream: bool = False
-
-
-class CommandArgsRequest(BaseModel):
-    args: dict[str, Any] = Field(default_factory=dict)
-
-
-class DiscoverRequest(BaseModel):
-    command_path: list[str] = Field(default_factory=list)
-
-
 def _now() -> str:
     return datetime.datetime.now().isoformat()
 
@@ -76,6 +64,246 @@ def _get_client() -> TMF620Client:
     if client is None:
         client = TMF620Client(config=config)
     return client
+
+
+def _tool_docstring(
+    *,
+    summary: str,
+    description: str,
+    parameters: list[dict[str, Any]] | None = None,
+) -> str:
+    lines = [summary.strip()]
+    description = description.strip()
+    if description:
+        lines.extend(["", description])
+    if parameters:
+        lines.extend(["", "Parameters:"])
+        for parameter in parameters:
+            requirement = "Required" if parameter["required"] else "Optional"
+            lines.append(
+                f"- {parameter['name']} ({requirement}): {parameter['description']}"
+            )
+    return "\n".join(lines)
+
+
+def _mcp_parameter_schema(arg_spec: dict[str, Any]) -> dict[str, Any] | None:
+    from tmf620_commands import _arg_dest, _arg_required
+
+    dest = _arg_dest(arg_spec)
+    if not dest:
+        return None
+
+    description = arg_spec.get("help", "")
+    if arg_spec.get("action") == "append":
+        return {
+            "name": dest,
+            "annotation": "list[str] | None",
+            "required": False,
+            "description": description,
+        }
+
+    py_type = arg_spec.get("type")
+    annotation = "int" if py_type is int else "str"
+    required = _arg_required(arg_spec)
+    if not required:
+        annotation = f"{annotation} | None"
+
+    return {
+        "name": dest,
+        "annotation": annotation,
+        "required": required,
+        "description": description,
+    }
+
+
+def _mcp_tool_parameters(node: dict[str, Any]) -> list[dict[str, Any]]:
+    from tmf620_commands import _arg_dest
+
+    required_parameters: list[dict[str, Any]] = []
+    optional_parameters: list[dict[str, Any]] = []
+    body_parameter_added = False
+
+    for arg_spec in node["args"]:
+        dest = _arg_dest(arg_spec)
+        if dest in {"body_json", "body_file"}:
+            if not body_parameter_added:
+                required_parameters.append(
+                    {
+                        "name": "body",
+                        "annotation": "dict[str, Any]",
+                        "required": True,
+                        "description": "JSON request body as a Python object.",
+                    }
+                )
+                body_parameter_added = True
+            continue
+
+        parameter = _mcp_parameter_schema(arg_spec)
+        if parameter is not None:
+            if parameter["required"]:
+                required_parameters.append(parameter)
+            else:
+                optional_parameters.append(parameter)
+
+    return [*required_parameters, *optional_parameters]
+
+
+def _build_tool_function_source(
+    *,
+    function_name: str,
+    command: str,
+    summary: str,
+    description: str,
+    parameters: list[dict[str, Any]],
+) -> str:
+    docstring = _tool_docstring(
+        summary=summary, description=description, parameters=parameters
+    )
+    signature_parts: list[str] = []
+    body_lines = ["args: dict[str, Any] = {}"]
+
+    for parameter in parameters:
+        param_line = (
+            f"{parameter['name']}: "
+            f"Annotated[{parameter['annotation']}, Field(description={parameter['description']!r})]"
+        )
+        if not parameter["required"]:
+            param_line += " = None"
+        signature_parts.append(param_line)
+
+        if parameter["name"] == "body":
+            body_lines.append('args["body"] = body')
+            continue
+
+        body_lines.append(f"if {parameter['name']} is not None:")
+        body_lines.append(f'    args["{parameter["name"]}"] = {parameter["name"]}')
+
+    body_lines.append(
+        f"return invoke_command({command!r}, args, config_path=None, output='json')"
+    )
+
+    signature = ", ".join(signature_parts)
+    if signature:
+        signature = f"({signature})"
+    else:
+        signature = "()"
+
+    indented_body = textwrap.indent("\n".join(body_lines), "    ")
+    return (
+        f"def {function_name}{signature} -> Any:\n"
+        f"    {docstring!r}\n"
+        f"{indented_body}\n"
+    )
+
+
+def _register_mcp_tool(
+    mcp_server: FastMCP,
+    *,
+    tool_name: str,
+    command: str,
+    summary: str,
+    description: str,
+    parameters: list[dict[str, Any]],
+) -> None:
+    namespace: dict[str, Any] = {}
+    source = _build_tool_function_source(
+        function_name=tool_name,
+        command=command,
+        summary=summary,
+        description=description,
+        parameters=parameters,
+    )
+    exec(source, globals(), namespace)
+    mcp_server.add_tool(
+        namespace[tool_name],
+        name=tool_name,
+        description=_tool_docstring(
+            summary=summary, description=description, parameters=parameters
+        ),
+        structured_output=False,
+    )
+
+
+def _register_mcp_tools(mcp_server: FastMCP) -> None:
+    _register_mcp_tool(
+        mcp_server,
+        tool_name="tmf620_health",
+        command="health",
+        summary="Check TMF620 API health",
+        description="Check whether the configured TMF620 API is reachable and return a health payload.",
+        parameters=[],
+    )
+    _register_mcp_tool(
+        mcp_server,
+        tool_name="tmf620_config",
+        command="config",
+        summary="Show resolved configuration",
+        description="Show the resolved configuration used by the CLI, including the TMF620 API base URL.",
+        parameters=[],
+    )
+    def _discover(
+        command_path: Annotated[
+            list[str] | None,
+            Field(
+                description=(
+                    "Optional command path to inspect, for example ['offering', 'patch']."
+                )
+            ),
+        ] = None,
+    ) -> Any:
+        """Print the command catalog or inspect one command path."""
+        if not command_path:
+            return get_catalog_payload()
+        payload = get_command_help_payload(" ".join(command_path))
+        if payload is None:
+            raise TMF620Error(
+                f"Unknown command path for discovery: {' '.join(command_path)}"
+            )
+        return payload
+
+    mcp_server.add_tool(
+        _discover,
+        name="tmf620_discover",
+        description=(
+            "Print the command catalog as JSON, or inspect one command path for "
+            "detailed arguments and examples."
+        ),
+        structured_output=False,
+    )
+
+    for node in COMMAND_TREE:
+        if node["name"] in {"health", "config"}:
+            continue
+        if node["kind"] == "command":
+            command_path = [node["name"]]
+            command = _command_path_tokens(command_path)
+            help_payload = get_command_help_payload(command)
+            _register_mcp_tool(
+                mcp_server,
+                tool_name=_command_operation_id(command_path),
+                command=command,
+                summary=help_payload["summary"] if help_payload else node["help"],
+                description=(
+                    help_payload["description"] if help_payload else node["description"]
+                ),
+                parameters=_mcp_tool_parameters(node),
+            )
+            continue
+
+        for child in node["commands"]:
+            command_path = [node["name"], child["name"]]
+            command = _command_path_tokens(command_path)
+            help_payload = get_command_help_payload(command)
+            _register_mcp_tool(
+                mcp_server,
+                tool_name=_command_operation_id(command_path),
+                command=command,
+                summary=help_payload["summary"] if help_payload else child["help"],
+                description=(
+                    help_payload["description"] if help_payload else child["description"]
+                ),
+                parameters=_mcp_tool_parameters(child),
+            )
 
 
 def _safe_call(fn, *args):
@@ -92,210 +320,6 @@ def _command_path_tokens(command_path: list[str]) -> str:
 
 def _command_operation_id(command_path: list[str]) -> str:
     return "tmf620_" + "_".join(token.replace("-", "_") for token in command_path)
-
-
-def _find_command_node(command_path: list[str]) -> dict[str, Any] | None:
-    current_nodes = COMMAND_TREE
-    node: dict[str, Any] | None = None
-
-    for token in command_path:
-        node = next(
-            (candidate for candidate in current_nodes if candidate["name"] == token),
-            None,
-        )
-        if node is None:
-            return None
-        current_nodes = node.get("commands", [])
-
-    return node
-
-
-def _validate_command_args(command_path: list[str], args: dict[str, Any]) -> None:
-    from tmf620_commands import (
-        _find_command_node,
-        _arg_dest,
-        _arg_required,
-        CommandInvocationError,
-    )
-
-    node = _find_command_node(command_path)
-    if node is None:
-        return
-
-    expected: set[str] = set()
-    for arg_spec in node["args"]:
-        dest = _arg_dest(arg_spec)
-        if dest:
-            expected.add(dest)
-    expected.update({"body", "body_json", "body_file"})
-
-    unexpected = sorted(key for key in args if key not in expected)
-    if unexpected:
-        raise CommandInvocationError(
-            "invalid_argument",
-            f"Unknown argument(s): {', '.join(unexpected)}",
-        )
-
-    missing: list[str] = []
-    for arg_spec in node["args"]:
-        dest = _arg_dest(arg_spec)
-        if not dest:
-            continue
-        if _arg_required(arg_spec) and args.get(dest) in (None, ""):
-            missing.append(dest)
-
-    if missing:
-        raise CommandInvocationError(
-            "missing_required_argument",
-            f"Missing required arguments: {', '.join(missing)}",
-        )
-
-
-def _register_command_route(
-    *,
-    command_path: list[str],
-    summary: str,
-    description: str,
-    handler,
-) -> None:
-    operation_id = _command_operation_id(command_path)
-    route_path = "/commands/" + "/".join(command_path)
-
-    async def endpoint(request: CommandArgsRequest):
-        try:
-            _validate_command_args(command_path, request.args)
-            return await asyncio.to_thread(handler, request.args)
-        except CommandInvocationError as exc:
-            status_code = 404 if exc.code == "command_not_found" else 400
-            next_actions = None
-            if exc.code in {"missing_required_argument", "invalid_argument"}:
-                next_actions = [
-                    {
-                        "type": "help",
-                        "request": {
-                            "command": "help",
-                            "args": {"command": _command_path_tokens(command_path)},
-                        },
-                    }
-                ]
-            return _json_error(
-                status_code,
-                exc.code,
-                str(exc),
-                next_actions=next_actions,
-            )
-        except TMF620Error as exc:
-            return _json_error(500, "tool_invocation_failed", str(exc))
-        except TypeError as exc:
-            return _json_error(400, "invalid_arguments", str(exc))
-        except Exception as exc:
-            logger.exception("Unexpected command route failure")
-            return _json_error(500, "tool_invocation_failed", str(exc))
-
-    endpoint.__name__ = operation_id
-    app.add_api_route(
-        route_path,
-        endpoint,
-        methods=["POST"],
-        operation_id=operation_id,
-        summary=summary,
-        description=description,
-    )
-
-
-def _register_mcp_command_routes() -> None:
-    _register_command_route(
-        command_path=["health"],
-        summary="Check TMF620 API health",
-        description=(
-            "Check whether the configured TMF620 API is reachable and return a health payload."
-        ),
-        handler=lambda _args: _get_client().health(),
-    )
-    _register_command_route(
-        command_path=["config"],
-        summary="Show resolved configuration",
-        description=(
-            "Show the resolved configuration used by the CLI, including the TMF620 API base URL."
-        ),
-        handler=lambda _args: _get_client().config,
-    )
-
-    def _discover_handler(args: dict[str, Any]) -> Any:
-        command_path = args.get("command_path", [])
-        if not command_path:
-            return get_catalog_payload()
-        if not isinstance(command_path, list) or not all(
-            isinstance(token, str) and token.strip() for token in command_path
-        ):
-            raise TMF620Error("command_path must be a list of non-empty strings.")
-        payload = get_command_help_payload(" ".join(command_path))
-        if payload is None:
-            raise TMF620Error(
-                f"Unknown command path for discovery: {' '.join(command_path)}"
-            )
-        return payload
-
-    async def discover_endpoint(request: DiscoverRequest):
-        try:
-            return await asyncio.to_thread(
-                _discover_handler, {"command_path": request.command_path}
-            )
-        except TMF620Error as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    discover_endpoint.__name__ = "tmf620_discover"
-    app.add_api_route(
-        "/commands/discover",
-        discover_endpoint,
-        methods=["POST"],
-        operation_id="tmf620_discover",
-        summary="Print command catalog or per-command schema",
-        description=(
-            "Print the command catalog as JSON, or inspect one command path for detailed arguments and examples."
-        ),
-    )
-
-    for node in COMMAND_TREE:
-        if node["name"] in {"health", "config"}:
-            continue
-        if node["kind"] == "command":
-            command_path = [node["name"]]
-            command = _command_path_tokens(command_path)
-            _register_command_route(
-                command_path=command_path,
-                summary=node["help"],
-                description=node["description"],
-                handler=lambda _args, command=command: invoke_command(
-                    command,
-                    {},
-                    config_path=None,
-                    output="json",
-                ),
-            )
-            continue
-
-        for child in node["commands"]:
-            command_path = [node["name"], child["name"]]
-            command = _command_path_tokens(command_path)
-
-            def _handler_factory(command: str):
-                def _handler(args: dict[str, Any]) -> Any:
-                    return invoke_command(
-                        command,
-                        args,
-                        config_path=None,
-                        output="json",
-                    )
-
-                return _handler
-
-            _register_command_route(
-                command_path=command_path,
-                summary=child["help"],
-                description=child["description"],
-                handler=_handler_factory(command),
-            )
 
 
 def _json_error(
@@ -369,13 +393,17 @@ def _streaming_result_chunks(command: str, args: dict[str, Any], result: Any):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global config, client
+    global config, client, mcp_session_manager
     config = load_config()
     client = TMF620Client(config=config)
     try:
         client.test_connection()
         logger.info("Successfully connected to TMF620 API")
-        yield
+        if mcp_session_manager is None:
+            yield
+            return
+        async with mcp_session_manager.run():
+            yield
     except Exception as exc:
         logger.error("Failed to initialize TMF620 MCP server: %s", exc)
         raise
@@ -600,10 +628,17 @@ async def server_config():
     }
 
 
-_register_mcp_command_routes()
-
-mcp = FastApiMCP(app)
-mcp.mount()
+mcp_server = FastMCP(
+    name="TMF620 Product Catalog MCP Server",
+    instructions=(
+        "TMF620 Product Catalog Management tools with explicit per-command schemas."
+    ),
+    streamable_http_path="/",
+)
+_register_mcp_tools(mcp_server)
+mcp_app = mcp_server.streamable_http_app()
+mcp_session_manager = mcp_server._session_manager
+app.mount("/mcp", mcp_app)
 
 
 def main():

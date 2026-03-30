@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m tmf620_benchmark token)",
+      "Bash(python -m tmf620_benchmark latency 30)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(python -m tmf620_mcp_server --help)",
+      "Bash(curl -s http://localhost:7701/mcp)",
+      "Bash(curl -s http://localhost:7701/health)",
+      "Bash(curl -s -X POST http://localhost:7701/mcp -H \"Content-Type: application/json\" -d '{\"\"\"\"jsonrpc\"\"\"\":\"\"\"\"2.0\"\"\"\",\"\"\"\"id\"\"\"\":1,\"\"\"\"method\"\"\"\":\"\"\"\"tools/list\"\"\"\"}')",
+      "Bash(curl -s http://localhost:7701/docs)",
+      "Bash(curl -s http://localhost:7701/api/cli -H \"Content-Type: application/json\")",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s -X POST http://localhost:7701/api/cli -H \"Content-Type: application/json\" -d '{\"\"\"\"command\"\"\"\":\"\"\"\"catalog list\"\"\"\",\"\"\"\"args\"\"\"\":{\"\"\"\"limit\"\"\"\":1}}')",
+      "Bash(curl -s -N http://localhost:7701/mcp)",
+      "Bash(curl -v http://localhost:7701/mcp)",
+      "Bash(curl -s -X POST http://localhost:7701/mcp/messages -H \"Content-Type: application/json\" -d '{\"\"\"\"jsonrpc\"\"\"\":\"\"\"\"2.0\"\"\"\",\"\"\"\"id\"\"\"\":1,\"\"\"\"method\"\"\"\":\"\"\"\"initialize\"\"\"\",\"\"\"\"params\"\"\"\":{\"\"\"\"protocolVersion\"\"\"\":\"\"\"\"2024-11-05\"\"\"\",\"\"\"\"capabilities\"\"\"\":{},\"\"\"\"clientInfo\"\"\"\":{\"\"\"\"name\"\"\"\":\"\"\"\"claude-code\"\"\"\",\"\"\"\"version\"\"\"\":\"\"\"\"1.0\"\"\"\"}}}')",
+      "Bash(ls -la /c/Projects/mcp/*.py)",
+      "Bash(git diff:*)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "tmf620"
+  ]
+}

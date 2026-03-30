@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "tmf620": {
+      "url": "http://localhost:7701/mcp"
+    }
+  }
+}
