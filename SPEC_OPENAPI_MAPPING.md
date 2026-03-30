@@ -36,7 +36,7 @@ Generating a CLI command and exposing it in the default registry are different d
 
 ### 2.4 Flatten request bodies conservatively
 
-Flatten only when the result is simple, stable, and clearly better for agents. For complex, polymorphic, or deeply nested bodies, exposing a single `body` argument is often safer than inventing a brittle pseudo-CLI surface.
+Flatten only when the result is simple, stable, and clearly better for agents. For complex, broad, or deeply nested bodies, keeping one or more properties as structured JSON arguments is often safer than inventing a brittle pseudo-CLI surface. See §6.1 and §6.2 for detailed flattening and mixed-property guidance.
 
 ### 2.5 Preserve stability across regenerations
 
@@ -175,6 +175,7 @@ OAS `$ref` parameters MUST be resolved before mapping. OAS `allOf` / `anyOf` / `
 - If a non-object request body is exposed as a single `body` argument and `requestBody.required` is `true`, omitting `args.body` MUST be treated as `missing_required_argument`.
 - If both OAS parameters and request-body properties map to the same CLI argument name, generation MUST fail with an error identifying the conflicting operation and field name unless the source OAS provides an `x-cli-arg-name` extension field on the conflicting parameter or body property to rename one of them.
 - Non-JSON request bodies MAY be excluded from the CLI registry by default. If exposed, the implementation MUST document the expected encoding in per-command help.
+- Implementations SHOULD stop flattening when a top-level property would require the generator to invent nested pseudo-CLI arguments for arrays of objects, recursive structures, or broad object graphs with context-dependent usage. In those cases, the property SHOULD remain a structured JSON argument under its source field name when practical.
 
 ### 6.2 Practical Mapping Guidance
 
@@ -183,7 +184,9 @@ Teams SHOULD prefer the narrowest stable CLI surface that still preserves agent 
 - query parameters usually map cleanly to CLI arguments
 - path parameters usually map cleanly to required CLI arguments
 - simple JSON object bodies often map cleanly to top-level CLI arguments
-- nested objects, arrays of objects, and polymorphic schemas usually deserve a `body` argument rather than aggressive flattening
+- nested objects, arrays of objects, recursive schemas, and broad object schemas with context-dependent usage usually deserve a structured JSON argument rather than aggressive flattening
+
+When a request body mixes simple top-level scalar properties with one nested property that carries most of the schema complexity, implementations SHOULD expose the simple scalars as normal CLI arguments and keep the complex property structured. For example, a create command can expose top-level fields such as `category`, `description`, or `priority` as normal arguments while accepting the complex array or object property as a structured JSON argument when that subtree contains nested required objects, arrays of objects, or recursion.
 
 If the generated command would require extensive explanation to use safely, the generator SHOULD prefer a less clever mapping and rely on richer help text.
 

@@ -34,7 +34,7 @@ It does not standardize:
 - authentication or authorization
 - backend implementation details
 - command naming conventions beyond reserved names
-- risk derivation policy (companion specs define how to populate the optional `risk` object)
+- risk derivation policy
 - OpenAPI generation rules
 - async job handling
 
@@ -453,3 +453,4 @@ A conformant implementation SHOULD:
 - include argument defaults when known
 - use standard error codes consistently
 - support streaming for list-like commands
+- include `risk` metadata in command help responses
