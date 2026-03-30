@@ -15,6 +15,8 @@ from mcp.server.fastmcp import FastMCP
 from tmf620_commands import (
     COMMAND_TREE,
     CommandInvocationError,
+    _command_identity,
+    _tool_name,
     get_catalog_payload,
     get_command_help_payload,
     invoke_command,
@@ -276,11 +278,11 @@ def _register_mcp_tools(mcp_server: FastMCP) -> None:
             continue
         if node["kind"] == "command":
             command_path = [node["name"]]
-            command = _command_path_tokens(command_path)
+            command = _command_identity(command_path)
             help_payload = get_command_help_payload(command)
             _register_mcp_tool(
                 mcp_server,
-                tool_name=_command_operation_id(command_path),
+                tool_name=_tool_name(*command_path),
                 command=command,
                 summary=help_payload["summary"] if help_payload else node["help"],
                 description=(
@@ -292,11 +294,11 @@ def _register_mcp_tools(mcp_server: FastMCP) -> None:
 
         for child in node["commands"]:
             command_path = [node["name"], child["name"]]
-            command = _command_path_tokens(command_path)
+            command = _command_identity(command_path)
             help_payload = get_command_help_payload(command)
             _register_mcp_tool(
                 mcp_server,
-                tool_name=_command_operation_id(command_path),
+                tool_name=_tool_name(*command_path),
                 command=command,
                 summary=help_payload["summary"] if help_payload else child["help"],
                 description=(
@@ -312,14 +314,6 @@ def _safe_call(fn, *args):
     except TMF620Error as exc:
         logger.error("%s", exc)
         return ApiResponse(error=str(exc), timestamp=_now())
-
-
-def _command_path_tokens(command_path: list[str]) -> str:
-    return " ".join(command_path)
-
-
-def _command_operation_id(command_path: list[str]) -> str:
-    return "tmf620_" + "_".join(token.replace("-", "_") for token in command_path)
 
 
 def _json_error(

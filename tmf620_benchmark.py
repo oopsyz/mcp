@@ -97,10 +97,6 @@ LATENCY_TESTS: list[dict[str, Any]] = [
 ]
 
 
-def _tool_name(*segments: str) -> str:
-    return "tmf620_" + "_".join(segment.replace("-", "_") for segment in segments)
-
-
 def _has_error_payload(payload: Any) -> bool:
     return isinstance(payload, dict) and (
         payload.get("status") == "error" or "error" in payload
@@ -194,6 +190,7 @@ def run_latency_benchmark(
 
         async def _bench_mcp(
             *,
+            session: ClientSession,
             label: str,
             tool_name: str,
             args: dict[str, Any],
@@ -203,29 +200,26 @@ def run_latency_benchmark(
             if verbose:
                 print(f"  {label} ({iterations} calls)...", end=" ", flush=True)
             latencies: list[float] = []
-            async with streamablehttp_client(f"{BASE}/mcp") as (read, write, _):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    available = {tool.name for tool in (await session.list_tools()).tools}
-                    if tool_name not in available:
-                        raise AssertionError(
-                            f"expected MCP tool {tool_name!r} to be available; got {sorted(available)!r}"
-                        )
-                    for _ in range(warmup_calls):
-                        warmup_result = await session.call_tool(tool_name, args)
-                        if not allow_error and getattr(warmup_result, "isError", False):
-                            raise AssertionError(
-                                f"unexpected warm-up error result from {tool_name}: {warmup_result}"
-                            )
-                    for _ in range(iterations):
-                        start = time.perf_counter()
-                        result = await session.call_tool(tool_name, args)
-                        elapsed = time.perf_counter() - start
-                        if not allow_error and getattr(result, "isError", False):
-                            raise AssertionError(
-                                f"unexpected error result from {tool_name}: {result}"
-                            )
-                        latencies.append(elapsed)
+            available = {tool.name for tool in (await session.list_tools()).tools}
+            if tool_name not in available:
+                raise AssertionError(
+                    f"expected MCP tool {tool_name!r} to be available; got {sorted(available)!r}"
+                )
+            for _ in range(warmup_calls):
+                warmup_result = await session.call_tool(tool_name, args)
+                if not allow_error and getattr(warmup_result, "isError", False):
+                    raise AssertionError(
+                        f"unexpected warm-up error result from {tool_name}: {warmup_result}"
+                    )
+            for _ in range(iterations):
+                start = time.perf_counter()
+                result = await session.call_tool(tool_name, args)
+                elapsed = time.perf_counter() - start
+                if not allow_error and getattr(result, "isError", False):
+                    raise AssertionError(
+                        f"unexpected error result from {tool_name}: {result}"
+                    )
+                latencies.append(elapsed)
             stats = _latency_stats(latencies)
             result = {
                 "label": label,
@@ -259,22 +253,26 @@ def run_latency_benchmark(
                 print(f"CLI vs MCP Benchmark  ({iterations} iterations per test)")
                 print("=" * 70)
 
-            for test in LATENCY_TESTS:
-                cli_result = await _bench_http(
-                    label=f"cli: {test['label']}",
-                    url=CLI_URL,
-                    payload=test["cli_payload"],
-                    allow_error=test.get("allow_error", False),
-                )
-                mcp_result = await _bench_mcp(
-                    label=f"mcp: {test['label']}",
-                    tool_name=_tool_name(*test["mcp_segments"]),
-                    args=test["mcp_payload"],
-                    allow_error=test.get("allow_error", False),
-                )
-                results.extend([cli_result, mcp_result])
-                if verbose:
-                    _print_comparison(cli_result, mcp_result)
+            async with streamablehttp_client(f"{BASE}/mcp") as (read, write, _):
+                async with ClientSession(read, write) as mcp_session:
+                    await mcp_session.initialize()
+                    for test in LATENCY_TESTS:
+                        cli_result = await _bench_http(
+                            label=f"cli: {test['label']}",
+                            url=CLI_URL,
+                            payload=test["cli_payload"],
+                            allow_error=test.get("allow_error", False),
+                        )
+                        mcp_result = await _bench_mcp(
+                            session=mcp_session,
+                            label=f"mcp: {test['label']}",
+                            tool_name=_tool_name(*test["mcp_segments"]),
+                            args=test["mcp_payload"],
+                            allow_error=test.get("allow_error", False),
+                        )
+                        results.extend([cli_result, mcp_result])
+                        if verbose:
+                            _print_comparison(cli_result, mcp_result)
 
             comparisons: list[dict[str, Any]] = []
             cli_results = [row for row in results if row["label"].startswith("cli:")]

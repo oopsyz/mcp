@@ -1,22 +1,28 @@
 # TMF620 CLI + MCP Server
 
-We are shifting the agent-facing interface toward the HTTP CLI API because it is materially cheaper to discover and easier to expand progressively than exposing the full MCP tool surface on every turn.
+This repo exposes the TMF620 command layer through two interfaces:
 
-Once the stack is running, paste the HTTP CLI API URL into a Codex, Claude, or Cursor chat window and start talking to it. The agent can discover commands through `/api/cli` and invoke them without a separate SDK.
+- a compact HTTP CLI API for progressive discovery
+- a real MCP server with explicit tool schemas
 
-The practical reasons are:
+The CLI API is the cheaper discovery path for agents that only need one command branch at a time. The MCP server is a proper tool surface with typed inputs, so it is better for standard MCP clients and stricter invocation contracts.
+
+The practical reasons to keep both are:
 
 - compact discovery: agents can start with `GET /api/cli` instead of ingesting the full MCP tool list up front
 - progressive help: agents can expand one command branch at a time with `help`
-- lower token cost: the benchmark in this repo shows the compact CLI path is much smaller than the wrapped MCP tool payload
+- stronger MCP contracts: MCP tools now expose explicit schemas instead of a generic `args` object
 - simpler automation: `curl` works well for both humans and agents, especially when the command surface is already structured
-- one shared command layer: the same command definitions back the HTTP CLI API, the MCP adapter, and the benchmark
+- one shared command layer: the same command definitions back the HTTP CLI API, the MCP server, and the benchmark
 
-The current benchmark numbers are:
+The current token benchmark numbers are:
 
-- MCP tool surface: `37` generated command tools
-- raw MCP discovery payload: `2,992` tokens
-- OpenAI-wrapped MCP tool payload: `3,325` tokens
+- MCP tool surface: `38` tools
+- raw MCP discovery payload: `7,143` tokens
+- OpenAI-wrapped MCP tool payload: `6,535` tokens
+
+Shared CLI discovery numbers:
+
 - compact `GET /api/cli`: `254` tokens
 - compact group help: `125` tokens
 - leaf help: `245` tokens
@@ -72,11 +78,11 @@ File: `tmf620_commands.py`
 
 File: `tmf620_mcp_server.py`
 
-- FastAPI + `fastapi-mcp`
+- FastAPI + the official MCP SDK (`FastMCP`)
 - exposes `/api/cli` for the HTTP CLI API pattern
-- exposes the same operations as MCP tools for MCP-capable agents
+- exposes explicit MCP tools for MCP-capable agents
 - delegates HTTP CLI requests into `tmf620_commands.py`
-- delegates MCP tools into `tmf620_core.py`
+- delegates MCP tools into the shared command layer
 
 ## Docker
 
@@ -240,12 +246,14 @@ Example Claude Desktop config:
 
 Available MCP tools:
 
-- Generated command tools under `/commands/...`, including `tmf620_health`, `tmf620_config`, `tmf620_discover`, and one tool per leaf command in `tmf620_commands.py`.
-- Compatibility tools remain for `health` and `server-config`.
+- `tmf620_health`
+- `tmf620_config`
+- `tmf620_discover`
+- one explicit tool per leaf command in `tmf620_commands.py`
 
-Tool count in this repo's MCP adapter: `40` total, with `38` generated command tools plus `2` compatibility tools.
+Tool count in this repo's MCP server: `38` total tools.
 
-The HTTP CLI API is routed through the MCP server. It uses the same `config.json` and shared command layer as the rest of the repo.
+The HTTP CLI API and MCP server share the same `config.json` and command layer, but they expose different discovery styles.
 
 ## Agent Discovery
 
@@ -351,18 +359,25 @@ curl http://localhost:7701/health
 
 ## Token Benchmark
 
-Use the built-in benchmark to compare the compact HTTP CLI discovery flow against the MCP tool payload exposed by this repo:
+Use the built-in benchmark to measure the live MCP tool payload alongside the compact HTTP CLI discovery flow:
 
 ```bash
 uv run tmf620-benchmark token
 uv run tmf620-benchmark token --output json
 ```
 
-The benchmark does not require the mock API or MCP server to be running. It measures the live local code:
+The token benchmark fetches the MCP tool list from the running server, so the stack must be up before you run it:
+
+Start the stack first:
+
+- `docker compose up --build`
+- or `uv run tmf620-mcp-server`
+
+It measures:
 
 - compact `GET /api/cli` catalog
 - compact group help and leaf help from `tmf620_commands.py`
-- raw MCP tool objects from `fastapi-mcp`
+- raw MCP tool objects from the live MCP server
 - OpenAI-style wrapped MCP tool payloads of the form `{"type":"function","function":{...}}`
 
 This makes it easy to reproduce the context-size comparison locally after future changes.

@@ -672,6 +672,10 @@ def _command_identity(path: list[str]) -> str:
     return " ".join(path)
 
 
+def _tool_name(*segments: str) -> str:
+    return "tmf620_" + "_".join(segment.replace("-", "_") for segment in segments)
+
+
 def _catalog_entries() -> list[dict[str, Any]]:
     commands: list[dict[str, Any]] = []
     for node in COMMAND_TREE:

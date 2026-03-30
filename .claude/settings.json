@@ -17,7 +17,9 @@
       "Bash(curl -v http://localhost:7701/mcp)",
       "Bash(curl -s -X POST http://localhost:7701/mcp/messages -H \"Content-Type: application/json\" -d '{\"\"\"\"jsonrpc\"\"\"\":\"\"\"\"2.0\"\"\"\",\"\"\"\"id\"\"\"\":1,\"\"\"\"method\"\"\"\":\"\"\"\"initialize\"\"\"\",\"\"\"\"params\"\"\"\":{\"\"\"\"protocolVersion\"\"\"\":\"\"\"\"2024-11-05\"\"\"\",\"\"\"\"capabilities\"\"\"\":{},\"\"\"\"clientInfo\"\"\"\":{\"\"\"\"name\"\"\"\":\"\"\"\"claude-code\"\"\"\",\"\"\"\"version\"\"\"\":\"\"\"\"1.0\"\"\"\"}}}')",
       "Bash(ls -la /c/Projects/mcp/*.py)",
-      "Bash(git diff:*)"
+      "Bash(git diff:*)",
+      "Bash(python -m py_compile tmf620_benchmark.py tmf620_mcp_server.py tmf620_commands.py)",
+      "Bash(python -m py_compile tmf620_benchmark.py)"
     ]
   },
   "enabledMcpjsonServers": [
