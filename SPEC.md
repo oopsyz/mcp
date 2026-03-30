@@ -34,7 +34,7 @@ It does not standardize:
 - authentication or authorization
 - backend implementation details
 - command naming conventions beyond reserved names
-- safety policy for read/write/destructive commands
+- risk derivation policy (companion specs define how to populate the optional `risk` object)
 - OpenAPI generation rules
 - async job handling
 
@@ -244,6 +244,12 @@ Detailed help for a leaf command MUST return enough information for an agent to 
   "command": "catalog list",
   "summary": "List catalogs.",
   "description": "Return catalogs from the backing service.",
+  "risk": {
+    "level": "read",
+    "reversible": true,
+    "idempotent": true,
+    "confirmation_required": false
+  },
   "arguments": [
     {
       "name": "limit",
@@ -276,6 +282,17 @@ Rules:
   - `required`
   - `default`
 - `type`, `description`, `enum`, `example`, and `warning` are RECOMMENDED when useful.
+- `risk`, when present, MUST be an object with the following fields:
+  - `level` (REQUIRED) — MUST be one of `read`, `write`, `destructive`, or `simulate`.
+    - `read` — no side effects.
+    - `write` — creates or modifies state.
+    - `destructive` — removes or irreversibly changes state.
+    - `simulate` — dry-run; no persistent side effects.
+  - `reversible` (RECOMMENDED) — boolean indicating whether the effect can be undone.
+  - `idempotent` (RECOMMENDED) — boolean indicating whether repeated calls produce the same result.
+  - `confirmation_required` (RECOMMENDED) — boolean hint that an agent should seek user confirmation before invoking.
+  - Omitting `risk` means the service does not declare it; agents SHOULD NOT assume safety from absence.
+  - Companion specs (e.g. `SPEC_OPENAPI_MAPPING.md`) MAY define derivation rules for populating `risk` from source metadata.
 
 This spec does not require one exact schema vocabulary beyond those common fields. The objective is agent usability, not schema maximalism.
 
