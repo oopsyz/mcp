@@ -1,4 +1,4 @@
-# TMF620 CLI + MCP Server
+# TMF620 CLI vs MCP
 
 This repo exposes the TMF620 command layer through two interfaces:
 
@@ -381,6 +381,41 @@ It measures:
 - OpenAI-style wrapped MCP tool payloads of the form `{"type":"function","function":{...}}`
 
 This makes it easy to reproduce the context-size comparison locally after future changes.
+
+## Latency Benchmark
+
+Use the latency benchmark when you want request-to-answer timing, not just invoke-only timing:
+
+```bash
+uv run tmf620-benchmark latency 30 --warmup 1
+```
+
+This benchmark measures the end-user path:
+
+- CLI: `GET /api/cli`, `help`, then command invoke
+- MCP: `list_tools`, then `tools/call`
+
+Use `--cold-start` when you want a fresh MCP connection per iteration:
+
+```bash
+uv run tmf620-benchmark latency 30 --warmup 1 --cold-start
+```
+
+That mode includes MCP `initialize`, `list_tools`, and `tools/call` in the timed span.
+
+Latest 30-iteration run:
+
+| Mode | CLI | MCP |
+| --- | ---: | ---: |
+| Invoke-only | about `45ms` to `49ms` | about `53ms` to `56ms` |
+| End-to-end | about `105ms` to `162ms` | about `107ms` to `117ms` |
+| Cold-start | about `100ms` to `168ms` | about `453ms` to `483ms` |
+
+Takeaways:
+
+- invoke-only timing is the raw command execution path
+- end-to-end timing includes CLI discovery and MCP tool lookup
+- cold-start timing includes MCP `initialize`, `list_tools`, and `tools/call`
 
 ## Packaging
 
