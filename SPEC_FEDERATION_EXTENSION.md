@@ -100,7 +100,9 @@ If you are building before this extension is standardized:
 - keep each service individually conformant to `SPEC.md`
 - do not overload single-service node IDs with undocumented cross-service meaning
 - use explicit local routing metadata if you experiment with federation
+- descriptive deployment prefixes such as `/tmf620/catalogmgt` MAY help humans or agents find a service entrypoint, but they SHOULD be treated only as bootstrap hints
 - avoid designs where a client must reverse-engineer service ownership from command names alone
+- avoid designs where a client must reverse-engineer service ownership from URI naming alone
 
 In other words: experiment locally, but do not make cross-service routing semantics look like settled core protocol.
 

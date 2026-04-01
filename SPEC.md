@@ -64,6 +64,10 @@ Streaming is useful for list-like outputs, but must remain opt-in and predictabl
 
 ## 3. Endpoint Contract
 
+Services MAY be deployed behind a service-specific base path such as `/tmf620/catalogmgt`.
+When they are, the CLI contract defined in this specification applies at `<base>/api/cli`.
+This is a deployment choice, not a routing contract requirement, and clients SHOULD rely on discovery metadata rather than URI naming alone to identify a service.
+
 ### 3.1 Discovery
 
 ```text
