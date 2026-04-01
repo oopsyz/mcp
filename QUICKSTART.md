@@ -1,10 +1,10 @@
-# TMF620 Quick Start
+﻿# TMF620 Quick Start
 
 ## Docker
 
 Use Docker if you want the mock API and MCP/HTTP CLI stack together in one containerized runtime.
 
-Once it is up, paste `http://localhost:7701/api/cli` into a Codex, Claude, or Cursor chat window and start talking to it.
+Once it is up, paste `http://localhost:7701/cli/tmf620/catalogmgt` into a Codex, Claude, or Cursor chat window and start talking to it.
 
 ```bash
 docker compose up --build
@@ -14,7 +14,7 @@ The container exposes:
 
 - mock API at `http://localhost:8801/tmf-api/productCatalogManagement/v5`
 - MCP transport at `http://localhost:7701/mcp`
-- HTTP CLI API at `http://localhost:7701/api/cli`
+- HTTP CLI API at `http://localhost:7701/cli/tmf620/catalogmgt`
 
 The container uses environment overrides rather than rewriting config files. Set them in `docker-compose.yml`, or use a `.env` file with Docker Compose
 
@@ -24,7 +24,7 @@ The container uses environment overrides rather than rewriting config files. Set
 
 Use this path for local development with `uv`.
 
-Once it is up, paste `http://localhost:7701/api/cli` into a Codex, Claude, or Cursor chat window and start talking to it.
+Once it is up, paste `http://localhost:7701/cli/tmf620/catalogmgt` into a Codex, Claude, or Cursor chat window and start talking to it.
 
 ### Prerequisites
 
@@ -48,7 +48,7 @@ uv run tmf620-mock-server
 
 The default TMF620 API base URL is `http://localhost:8801/tmf-api/productCatalogManagement/v5`.
 
-The MCP server also exposes the HTTP CLI API pattern at `http://localhost:7701/api/cli`.
+The MCP server also exposes the HTTP CLI API pattern at `http://localhost:7701/cli/tmf620/catalogmgt`.
 
 ### Use The HTTP CLI API
 
@@ -56,43 +56,43 @@ The HTTP CLI API is the command interface for agents and scripts. With the defau
 
 ```bash
 # Discover command surface as JSON
-curl -s http://localhost:7701/api/cli
+curl -s http://localhost:7701/cli/tmf620/catalogmgt
 
 # Request the richer catalog only when needed
-curl -s "http://localhost:7701/api/cli?verbose=true"
+curl -s "http://localhost:7701/cli/tmf620/catalogmgt?verbose=true"
 
 # Get per-command help
-curl -s -X POST http://localhost:7701/api/cli \
+curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"offering"}}'
 
 # Leaf help expands to the detailed argument schema
-curl -s -X POST http://localhost:7701/api/cli \
+curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"catalog list"}}'
 
 # Check API health
-curl -s -X POST http://localhost:7701/api/cli \
+curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"health","args":{}}'
 
 # List catalogs
-curl -s -X POST http://localhost:7701/api/cli \
+curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"catalog list","args":{}}'
 
 # Get one catalog
-curl -s -X POST http://localhost:7701/api/cli \
+curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"catalog get","args":{"catalog_id":"cat-001"}}'
 
 # List offerings for a catalog
-curl -s -X POST http://localhost:7701/api/cli \
+curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"offering list","args":{"catalog_id":"cat-001"}}'
 
 # Create an offering
-curl -s -X POST http://localhost:7701/api/cli \
+curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"offering create","args":{"body":{"name":"Premium Ethernet","description":"Managed enterprise access","lifecycleStatus":"Active","productOfferingPrice":[{"id":"pop-001","href":"http://localhost:8801/tmf-api/productCatalogManagement/v5/productOfferingPrice/pop-001","name":"Monthly fee","priceType":"recurring","price":{"taxIncludedAmount":{"unit":"USD","value":99.0}}}],"productCatalog":{"id":"cat-001"}}}}'
 ```
@@ -130,8 +130,10 @@ You can override the config path with `TMF620_CONFIG_PATH`.
 
 ## Notes
 
-- Use compact `GET /api/cli` for discovery, `GET /api/cli?verbose=true` only when you need the richer catalog, compact group help for branch selection, and detailed leaf help only when you are ready to invoke.
+- Use compact `GET /cli/tmf620/catalogmgt` for discovery, `GET /cli/tmf620/catalogmgt?verbose=true` only when you need the richer catalog, compact group help for branch selection, and detailed leaf help only when you are ready to invoke.
 - The MCP server is now a thin adapter over the same shared client logic.
 - The shared command registry lives in `tmf620_commands.py`.
 - The MCP adapter in this repo exposes 40 tools: 38 generated command routes plus 2 compatibility tools.
 - If the API is not running at the configured URL, both the HTTP CLI API and MCP server will fail.
+
+

@@ -64,14 +64,13 @@ Streaming is useful for list-like outputs, but must remain opt-in and predictabl
 
 ## 3. Endpoint Contract
 
-Services MAY be deployed behind a service-specific base path such as `/tmf620/catalogmgt`.
-When they are, the CLI contract defined in this specification applies at `<base>/api/cli`.
-This is a deployment choice, not a routing contract requirement, and clients SHOULD rely on discovery metadata rather than URI naming alone to identify a service.
+The canonical CLI endpoint defined by this specification is `/cli`.
+Deployments MAY place additional infrastructure prefixes in front of it, but `/cli` is the agent-facing protocol root.
 
 ### 3.1 Discovery
 
 ```text
-GET /api/cli
+GET /cli
 ```
 
 Returns the root command catalog.
@@ -79,7 +78,7 @@ Returns the root command catalog.
 ### 3.2 Dispatch
 
 ```text
-POST /api/cli
+POST /cli
 Content-Type: application/json
 ```
 
@@ -170,7 +169,7 @@ The wire contract treats each full command path as the command identity.
 
 ### 6.1 Root Catalog Response
 
-`GET /api/cli` and `POST /api/cli {"command":"help"}` MUST return the root catalog:
+`GET /cli` and `POST /cli {"command":"help"}` MUST return the root catalog:
 
 ```json
 {
@@ -439,11 +438,11 @@ Future versions may reserve additional names, but this version keeps the reserve
 
 A conformant implementation MUST:
 
-1. Expose `GET /api/cli` and return a root catalog.
-2. Accept `POST /api/cli` with the request envelope defined in this document.
+1. Expose `GET /cli` and return a root catalog.
+2. Accept `POST /cli` with the request envelope defined in this document.
 3. Support `help` as a reserved command.
-4. Return root discovery for `POST /api/cli {"command":"help"}`.
-5. Return command or group help for `POST /api/cli {"command":"help","args":{"command":"..."}}`.
+4. Return root discovery for `POST /cli {"command":"help"}`.
+5. Return command or group help for `POST /cli {"command":"help","args":{"command":"..."}}`.
 6. Return `help_target_not_found` for unknown help targets.
 7. Return `command_not_found` for unknown invokable commands.
 8. Include `interface: "cli"` and `version: "1.0"` in every non-streaming JSON response.

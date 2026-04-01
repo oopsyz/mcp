@@ -1,4 +1,4 @@
-import urllib.request
+﻿import urllib.request
 import json
 
 BASE = "http://localhost:7701"
@@ -36,9 +36,9 @@ def raw_post(url, data_bytes):
 print("=== SPEC.md CONFORMANCE TEST SUITE ===")
 print()
 
-# 1. GET /api/cli - root catalog (Conformance #1)
-print("--- 1. GET /api/cli (root catalog) [Conf #1,#4] ---")
-code, body = get(BASE + "/api/cli")
+# 1. GET /cli/tmf620/catalogmgt - root catalog (Conformance #1)
+print("--- 1. GET /cli/tmf620/catalogmgt (root catalog) [Conf #1,#4] ---")
+code, body = get(BASE + "/cli/tmf620/catalogmgt")
 print("  HTTP", code)
 print(
     "  status:",
@@ -49,10 +49,15 @@ print(
     body.get("version"),
 )
 print("  service:", body.get("service"))
+print("  namespace:", body.get("namespace"))
+print("  canonical_endpoint:", body.get("canonical_endpoint"))
 print("  commands:", body.get("total"))
 assert body["status"] == "ok"
 assert body["interface"] == "cli"
 assert body["version"] == "1.0"
+assert body["service"] == "tmf620"
+assert body["namespace"] == "tmf620/catalogmgt"
+assert body["canonical_endpoint"] == "/cli/tmf620/catalogmgt"
 assert "commands" in body
 assert body["total"] == len(body["commands"])
 for cmd in body["commands"]:
@@ -66,17 +71,17 @@ print("  PASS - compact root catalog, all fields present")
 # 2. POST help root (Conformance #3,#4)
 print()
 print("--- 2. POST {command:help} (root catalog via help) [Conf #3,#4] ---")
-code2, body2 = post(BASE + "/api/cli", {"command": "help"})
+code2, body2 = post(BASE + "/cli/tmf620/catalogmgt", {"command": "help"})
 assert body2["status"] == "ok" and body2["interface"] == "cli"
 assert body2["total"] == body["total"]
-print("  Matches GET /api/cli: True")
+print("  Matches GET /cli/tmf620/catalogmgt: True")
 print("  PASS")
 
 # 3. Group help (Spec 6.2)
 print()
 print("--- 3. POST help 'catalog' (group help) [Spec 6.2] ---")
 code3, body3 = post(
-    BASE + "/api/cli", {"command": "help", "args": {"command": "catalog"}}
+    BASE + "/cli/tmf620/catalogmgt", {"command": "help", "args": {"command": "catalog"}}
 )
 print("  status:", body3.get("status"), " kind:", body3.get("kind"))
 print("  subcommands:", [s["name"] for s in body3.get("subcommands", [])])
@@ -92,7 +97,7 @@ print("  PASS - group help is compact, no full schemas")
 print()
 print("--- 4. POST help 'catalog list' (command help) [Spec 6.3] ---")
 code4, body4 = post(
-    BASE + "/api/cli", {"command": "help", "args": {"command": "catalog list"}}
+    BASE + "/cli/tmf620/catalogmgt", {"command": "help", "args": {"command": "catalog list"}}
 )
 print("  status:", body4.get("status"), " command:", body4.get("command"))
 print("  summary:", body4.get("summary"))
@@ -109,7 +114,7 @@ print("  PASS - all required argument fields present")
 print()
 print("--- 5. POST help 'bogus' (help_target_not_found) [Conf #6] ---")
 code5, body5 = post(
-    BASE + "/api/cli", {"command": "help", "args": {"command": "bogus"}}
+    BASE + "/cli/tmf620/catalogmgt", {"command": "help", "args": {"command": "bogus"}}
 )
 print("  HTTP", code5, " code:", body5["error"]["code"])
 assert code5 == 404
@@ -120,7 +125,7 @@ print("  PASS")
 # 6. Invalid JSON (Spec 8)
 print()
 print("--- 6. Invalid JSON (invalid_json) [Spec 8] ---")
-code6, raw6, _ = raw_post(BASE + "/api/cli", b"not json")
+code6, raw6, _ = raw_post(BASE + "/cli/tmf620/catalogmgt", b"not json")
 body6 = json.loads(raw6)
 print("  HTTP", code6, " code:", body6["error"]["code"])
 assert code6 == 400
@@ -130,7 +135,7 @@ print("  PASS")
 # 7. Invalid command - empty/missing (Spec 8)
 print()
 print("--- 7. Empty body {} (invalid_command) [Spec 8] ---")
-code7, body7 = post(BASE + "/api/cli", {})
+code7, body7 = post(BASE + "/cli/tmf620/catalogmgt", {})
 print("  HTTP", code7, " code:", body7["error"]["code"])
 assert code7 == 400
 assert body7["error"]["code"] == "invalid_command"
@@ -139,7 +144,7 @@ print("  PASS")
 # 8. Unknown command (Conformance #7)
 print()
 print("--- 8. Unknown command (command_not_found) [Conf #7] ---")
-code8, body8 = post(BASE + "/api/cli", {"command": "bogus_command"})
+code8, body8 = post(BASE + "/cli/tmf620/catalogmgt", {"command": "bogus_command"})
 print("  HTTP", code8, " code:", body8["error"]["code"])
 assert code8 == 404
 assert body8["error"]["code"] == "command_not_found"
@@ -151,7 +156,7 @@ print("  PASS")
 print()
 print("--- 9. Non-object args (invalid_arguments) [Spec 8] ---")
 code9, raw9, _ = raw_post(
-    BASE + "/api/cli", json.dumps({"command": "health", "args": [1, 2]}).encode()
+    BASE + "/cli/tmf620/catalogmgt", json.dumps({"command": "health", "args": [1, 2]}).encode()
 )
 body9 = json.loads(raw9)
 print("  HTTP", code9, " code:", body9["error"]["code"])
@@ -162,7 +167,7 @@ print("  PASS")
 # 10. Missing required argument (Spec 8)
 print()
 print("--- 10. Missing required argument (missing_required_argument) [Spec 8] ---")
-code10, body10 = post(BASE + "/api/cli", {"command": "catalog get"})
+code10, body10 = post(BASE + "/cli/tmf620/catalogmgt", {"command": "catalog get"})
 print("  HTTP", code10, " code:", body10["error"]["code"])
 assert code10 == 400
 assert body10["error"]["code"] == "missing_required_argument"
@@ -176,7 +181,7 @@ print("  PASS")
 print()
 print("--- 11. Non-bool stream (invalid_request) [Spec 8] ---")
 code11, raw11, _ = raw_post(
-    BASE + "/api/cli", json.dumps({"command": "health", "stream": "yes"}).encode()
+    BASE + "/cli/tmf620/catalogmgt", json.dumps({"command": "health", "stream": "yes"}).encode()
 )
 body11 = json.loads(raw11)
 print("  HTTP", code11, " code:", body11["error"]["code"])
@@ -188,7 +193,7 @@ print("  PASS")
 print()
 print("--- 12. Streaming NDJSON [Spec 9, Conf #10] ---")
 code12, raw12, headers12 = raw_post(
-    BASE + "/api/cli",
+    BASE + "/cli/tmf620/catalogmgt",
     json.dumps({"command": "catalog list", "stream": True}).encode(),
 )
 ct = headers12.get("Content-Type", "") if headers12 else ""
@@ -209,7 +214,7 @@ print("  PASS")
 # 13. Invocation response shape (Spec 7, Conformance #8)
 print()
 print("--- 13. Invocation response shape [Spec 7, Conf #8] ---")
-code13, body13 = post(BASE + "/api/cli", {"command": "health"})
+code13, body13 = post(BASE + "/cli/tmf620/catalogmgt", {"command": "health"})
 print(
     "  status:",
     body13["status"],
@@ -234,7 +239,7 @@ print("  PASS")
 # 14. Error response shape validation (Spec 8)
 print()
 print("--- 14. Error response shape validation [Spec 8] ---")
-code14, body14 = post(BASE + "/api/cli", {"command": "catalog get"})
+code14, body14 = post(BASE + "/cli/tmf620/catalogmgt", {"command": "catalog get"})
 assert body14["status"] == "error"
 assert body14["interface"] == "cli"
 assert body14["version"] == "1.0"
@@ -252,7 +257,7 @@ print("  PASS")
 print()
 print("--- 15. POST help 'help' (is help a valid help target?) ---")
 code15, body15 = post(
-    BASE + "/api/cli", {"command": "help", "args": {"command": "help"}}
+    BASE + "/cli/tmf620/catalogmgt", {"command": "help", "args": {"command": "help"}}
 )
 print("  HTTP", code15, " status:", body15.get("status"))
 if body15.get("status") == "error":
@@ -269,3 +274,5 @@ print()
 print("========================================")
 print("ALL 15 CONFORMANCE TESTS PASSED")
 print("========================================")
+
+

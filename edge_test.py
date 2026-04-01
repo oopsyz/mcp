@@ -1,4 +1,4 @@
-import urllib.request
+﻿import urllib.request
 import json
 
 BASE = "http://localhost:7701"
@@ -33,7 +33,7 @@ print()
 
 # 1. Non-object top-level body (array)
 print("--- 1. Array body (invalid_request) ---")
-code, raw, _ = raw_post(BASE + "/api/cli", json.dumps([1, 2, 3]).encode())
+code, raw, _ = raw_post(BASE + "/cli/tmf620/catalogmgt", json.dumps([1, 2, 3]).encode())
 body = json.loads(raw)
 print("  HTTP", code, "code:", body["error"]["code"])
 assert body["error"]["code"] == "invalid_request"
@@ -43,7 +43,7 @@ print("  PASS")
 print()
 print("--- 2. Streaming single-result command (health) ---")
 code, raw, hdrs = raw_post(
-    BASE + "/api/cli", json.dumps({"command": "health", "stream": True}).encode()
+    BASE + "/cli/tmf620/catalogmgt", json.dumps({"command": "health", "stream": True}).encode()
 )
 ct = hdrs.get("Content-Type", "")
 lines = [l for l in raw.decode().strip().split("\n") if l]
@@ -58,7 +58,7 @@ print("  PASS")
 print()
 print("--- 3. Extra fields in request ---")
 code, body = post(
-    BASE + "/api/cli",
+    BASE + "/cli/tmf620/catalogmgt",
     {"command": "health", "args": {}, "stream": False, "extra": True},
 )
 print("  HTTP", code, "status:", body["status"])
@@ -67,7 +67,7 @@ print("  PASS (extra fields ignored)")
 # 4. Whitespace in command
 print()
 print("--- 4. Whitespace in command ---")
-code, body = post(BASE + "/api/cli", {"command": "  health  "})
+code, body = post(BASE + "/cli/tmf620/catalogmgt", {"command": "  health  "})
 print("  HTTP", code, "status:", body["status"], "command:", body.get("command"))
 assert body["status"] == "ok"
 print("  PASS")
@@ -75,7 +75,7 @@ print("  PASS")
 # 5. Unknown arguments on command
 print()
 print("--- 5. Unknown arguments (should error per spec?) ---")
-code, body = post(BASE + "/api/cli", {"command": "health", "args": {"bogus": 123}})
+code, body = post(BASE + "/cli/tmf620/catalogmgt", {"command": "health", "args": {"bogus": 123}})
 print("  HTTP", code, "status:", body.get("status"))
 if body.get("status") == "error":
     print("  error_code:", body["error"]["code"])
@@ -98,7 +98,7 @@ errors = [
 ]
 all_ok = True
 for label, payload in errors:
-    code, raw, _ = raw_post(BASE + "/api/cli", payload)
+    code, raw, _ = raw_post(BASE + "/cli/tmf620/catalogmgt", payload)
     body = json.loads(raw)
     has_iface = body.get("interface") == "cli"
     has_ver = body.get("version") == "1.0"
@@ -120,7 +120,7 @@ print("  All errors conform: " + str(all_ok))
 # 7. Reserved 'help' cannot be overridden
 print()
 print("--- 7. Reserved 'help' command ---")
-code, body = post(BASE + "/api/cli", {"command": "help"})
+code, body = post(BASE + "/cli/tmf620/catalogmgt", {"command": "help"})
 assert body["status"] == "ok"
 print("  help returns catalog: True")
 print("  PASS")
@@ -128,7 +128,7 @@ print("  PASS")
 # 8. Response envelope check for invocation
 print()
 print("--- 8. Invocation envelope completeness ---")
-code, body = post(BASE + "/api/cli", {"command": "health"})
+code, body = post(BASE + "/cli/tmf620/catalogmgt", {"command": "health"})
 assert body["status"] == "ok"
 assert body["interface"] == "cli"
 assert body["version"] == "1.0"
@@ -141,7 +141,7 @@ print("  PASS")
 print()
 print("--- 9. Help response shape (not invocation envelope) ---")
 code, body = post(
-    BASE + "/api/cli", {"command": "help", "args": {"command": "catalog list"}}
+    BASE + "/cli/tmf620/catalogmgt", {"command": "help", "args": {"command": "catalog list"}}
 )
 print("  Has status:", "status" in body)
 print("  Has interface:", "interface" in body)
@@ -156,7 +156,7 @@ print("  PASS")
 # 10. Group-only invocation
 print()
 print("--- 10. Invoking a group (catalog without subcommand) ---")
-code, body = post(BASE + "/api/cli", {"command": "catalog"})
+code, body = post(BASE + "/cli/tmf620/catalogmgt", {"command": "catalog"})
 print("  HTTP", code, "status:", body.get("status"))
 if body.get("status") == "error":
     print("  error_code:", body["error"]["code"])
@@ -166,3 +166,5 @@ else:
 
 print()
 print("=== EDGE CASE ANALYSIS COMPLETE ===")
+
+

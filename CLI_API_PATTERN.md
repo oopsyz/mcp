@@ -1,4 +1,4 @@
-# Building a CLI-Style HTTP API for LLM Agents
+﻿# Building a CLI-Style HTTP API for LLM Agents
 
 ## Why This Pattern
 
@@ -8,8 +8,8 @@ A CLI-style HTTP API shifts that cost. The agent starts with a compact catalog, 
 
 Practical benefits:
 
-- Compact discovery with `GET /api/cli`
-- Progressive help with `POST /api/cli {"command":"help",...}`
+- Compact discovery with `GET /cli`
+- Progressive help with `POST /cli {"command":"help",...}`
 - Lower token cost than exposing every operation as a separate tool
 - Simple automation with `curl`
 - One shared command layer for HTTP, MCP, tests, and benchmarks
@@ -23,7 +23,7 @@ This pattern is especially useful when a service has dozens of operations or mor
 A CLI-style HTTP API is a single-endpoint interface for discovery and invocation:
 
 ```text
-POST /api/cli
+POST /cli
 { "command": "<name>", "args": { ... }, "stream": false }
 ```
 
@@ -31,9 +31,9 @@ One endpoint. One request envelope. Built-in help.
 
 The agent workflow is:
 
-1. `GET /api/cli`
-2. `POST /api/cli {"command":"help","args":{"command":"..."}}`
-3. `POST /api/cli {"command":"...","args":{...}}`
+1. `GET /cli`
+2. `POST /cli {"command":"help","args":{"command":"..."}}`
+3. `POST /cli {"command":"...","args":{...}}`
 
 ---
 
@@ -47,7 +47,7 @@ All discovery and invocation happen through one URL.
 
 The catalog stays compact. Full detail is fetched only for one command at a time.
 
-- `GET /api/cli` -> compact catalog
+- `GET /cli` -> compact catalog
 - `POST {"command":"help","args":{"command":"<name>"}}` -> detailed help
 - `POST {"command":"<name>","args":{...}}` -> invoke
 
@@ -234,12 +234,12 @@ def _catalog_payload() -> dict:
         "version": "1.0",
         "service": "my-service",
         "how_to_invoke": {
-            "endpoint": "POST /api/cli",
+            "endpoint": "POST /cli",
             "shape": {"command": "<command_name>", "args": {}, "stream": False},
         },
         "how_to_get_help": {
-            "all_commands": "GET /api/cli or POST /api/cli {\"command\": \"help\"}",
-            "one_command": "POST /api/cli {\"command\": \"help\", \"args\": {\"command\": \"<name>\"}}",
+            "all_commands": "GET /cli or POST /cli {\"command\": \"help\"}",
+            "one_command": "POST /cli {\"command\": \"help\", \"args\": {\"command\": \"<name>\"}}",
         },
         "commands": commands,
         "total": len(commands),
@@ -319,12 +319,12 @@ def _error(status_code: int, code: str, message: str) -> JSONResponse:
     )
 
 
-@app.custom_route("/api/cli", methods=["GET"])
+@app.custom_route("/cli", methods=["GET"])
 async def cli_catalog(request: Request):
     return JSONResponse(_catalog_payload())
 
 
-@app.custom_route("/api/cli", methods=["POST"])
+@app.custom_route("/cli", methods=["POST"])
 async def cli_dispatch(request: Request):
     try:
         payload = await request.json()
@@ -429,7 +429,7 @@ async def cli_dispatch(request: Request):
 ### Level 3 - Invocation
 
 ```json
-POST /api/cli
+POST /cli
 {"command":"list_items","args":{"category":"electronics","limit":5},"stream":true}
 ```
 
@@ -447,7 +447,7 @@ POST /api/cli
 ### Basic
 
 ```text
-1. GET  /api/cli                                        -> discover commands
+1. GET  /cli                                        -> discover commands
 2. POST {"command":"help","args":{"command":"..."}}     -> inspect one command
 3. POST {"command":"...","args":{...}}                  -> invoke
 ```
@@ -468,7 +468,7 @@ At larger tool counts, add a `semantic_find` command so the agent can narrow bef
 
 ### Discovery
 
-- [ ] `GET /api/cli` returns a compact catalog
+- [ ] `GET /cli` returns a compact catalog
 - [ ] `POST {"command":"help"}` returns the same catalog
 - [ ] `POST {"command":"help","args":{"command":"<name>"}}` returns detailed help
 - [ ] Unknown help targets return `help_target_not_found`
@@ -497,23 +497,23 @@ At larger tool counts, add a `semantic_find` command so the agent can narrow bef
 ### Bash / curl
 
 ```bash
-curl -s http://myserver:9000/api/cli | jq .
+curl -s http://myserver:9000/cli | jq .
 ```
 
 ```bash
-curl -s -X POST http://myserver:9000/api/cli \
+curl -s -X POST http://myserver:9000/cli \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"list_items"}}' | jq .
 ```
 
 ```bash
-curl -s -X POST http://myserver:9000/api/cli \
+curl -s -X POST http://myserver:9000/cli \
   -H "Content-Type: application/json" \
   -d '{"command":"list_items","args":{"category":"electronics","limit":5}}' | jq .
 ```
 
 ```bash
-curl -s --no-buffer -X POST http://myserver:9000/api/cli \
+curl -s --no-buffer -X POST http://myserver:9000/cli \
   -H "Content-Type: application/json" \
   -d '{"command":"list_items","args":{"limit":100},"stream":true}'
 ```
@@ -569,7 +569,7 @@ async def cli(context, command: str, args: dict = {}, stream: bool = False) -> d
 
 **Security**
 
-- Add authentication before exposing `/api/cli` remotely
+- Add authentication before exposing `/cli` remotely
 - Enforce authorization by command group or capability
 - Add rate limits
 - Add audit logging
@@ -590,3 +590,4 @@ If tools use an MCP `context`, remember HTTP callers may not have one.
 **Versioning**
 
 Include a `version` field in non-streaming responses so agents can detect contract changes.
+

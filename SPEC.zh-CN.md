@@ -1,4 +1,4 @@
-# CLI 风格 HTTP API 核心规范
+﻿# CLI 风格 HTTP API 核心规范
 
 状态：草案 v1
 
@@ -67,7 +67,7 @@
 ### 3.1 发现
 
 ```text
-GET /api/cli
+GET /cli
 ```
 
 返回根命令目录。
@@ -75,7 +75,7 @@ GET /api/cli
 ### 3.2 调度
 
 ```text
-POST /api/cli
+POST /cli
 Content-Type: application/json
 ```
 
@@ -166,7 +166,7 @@ Content-Type: application/json
 
 ### 6.1 根目录响应
 
-`GET /api/cli` 和 `POST /api/cli {"command":"help"}` MUST 返回根目录：
+`GET /cli` 和 `POST /cli {"command":"help"}` MUST 返回根目录：
 
 ```json
 {
@@ -435,11 +435,11 @@ Content-Type: application/x-ndjson
 
 一致性实现 MUST：
 
-1. 暴露 `GET /api/cli` 并返回根目录。
-2. 接受使用本文档定义的请求信封的 `POST /api/cli`。
+1. 暴露 `GET /cli` 并返回根目录。
+2. 接受使用本文档定义的请求信封的 `POST /cli`。
 3. 支持 `help` 作为保留命令。
-4. 对 `POST /api/cli {"command":"help"}` 返回根发现。
-5. 对 `POST /api/cli {"command":"help","args":{"command":"..."}}` 返回命令或分组帮助。
+4. 对 `POST /cli {"command":"help"}` 返回根发现。
+5. 对 `POST /cli {"command":"help","args":{"command":"..."}}` 返回命令或分组帮助。
 6. 对未知的帮助目标返回 `help_target_not_found`。
 7. 对未知的可调用命令返回 `command_not_found`。
 8. 在每个非流式 JSON 响应中包含 `interface: "cli"` 和 `version: "1.0"`。
@@ -454,3 +454,4 @@ Content-Type: application/x-ndjson
 - 一致使用标准错误码
 - 对列表类命令支持流式传输
 - 在命令帮助响应中包含 `risk` 元数据
+

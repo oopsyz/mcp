@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import json
 from pathlib import Path
 from typing import Any, Callable
@@ -7,6 +7,10 @@ from tmf620_core import TMF620Client, TMF620Error
 
 
 Handler = Callable[[argparse.Namespace], Any]
+
+SERVICE_ID = "tmf620"
+SERVICE_NAMESPACE = "tmf620/catalogmgt"
+CANONICAL_CLI_ENDPOINT = f"/cli/{SERVICE_NAMESPACE}"
 
 
 class CommandInvocationError(TMF620Error):
@@ -696,14 +700,22 @@ def _catalog_payload(
         "status": "ok",
         "interface": "cli",
         "version": "1.0",
-        "service": "tmf620",
+        "service": SERVICE_ID,
+        "namespace": SERVICE_NAMESPACE,
+        "canonical_endpoint": CANONICAL_CLI_ENDPOINT,
         "how_to_invoke": {
-            "endpoint": "POST /api/cli",
+            "endpoint": f"POST {CANONICAL_CLI_ENDPOINT}",
             "shape": {"command": "<command_name>", "args": {}, "stream": False},
         },
         "how_to_get_help": {
-            "all_commands": 'GET /api/cli or POST /api/cli {"command":"help"}',
-            "one_command": 'POST /api/cli {"command":"help","args":{"command":"<command path>"}}',
+            "all_commands": (
+                f'GET {CANONICAL_CLI_ENDPOINT} or '
+                f'POST {CANONICAL_CLI_ENDPOINT} {{"command":"help"}}'
+            ),
+            "one_command": (
+                f'POST {CANONICAL_CLI_ENDPOINT} '
+                '{"command":"help","args":{"command":"<command path>"}}'
+            ),
         },
         "commands": _catalog_entries(),
         "total": len(COMMAND_TREE),
@@ -959,7 +971,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="resource",
         required=True,
         metavar="COMMAND",
-        help="Top-level command. Use GET /api/cli for the command catalog.",
+        help="Top-level command. Use GET /cli/tmf620/catalogmgt for the command catalog.",
     )
 
     discover_parser = subparsers.add_parser(
@@ -994,3 +1006,5 @@ def build_parser() -> argparse.ArgumentParser:
 def dump_payload(payload: Any, output_format: str) -> None:
     indent = 2 if output_format == "pretty" else None
     print(json.dumps(payload, indent=indent, default=str))
+
+

@@ -38,6 +38,11 @@ config: Optional[dict[str, Any]] = None
 client: Optional[TMF620Client] = None
 mcp_session_manager: Any = None
 
+CLI_NAMESPACE = "tmf620/catalogmgt"
+CLI_ROUTE = f"/cli/{CLI_NAMESPACE}"
+ROOT_CLI_ROUTE = "/cli"
+LEGACY_CLI_ROUTE = "/api/cli"
+
 
 class ProductOfferingRequest(BaseModel):
     name: str
@@ -426,12 +431,20 @@ async def health_check():
     return payload
 
 
-@app.get("/api/cli", operation_id="cli_catalog", include_in_schema=False)
+@app.get(CLI_ROUTE, operation_id="cli_catalog", include_in_schema=False)
+@app.get(ROOT_CLI_ROUTE, operation_id="compat_root_cli_catalog", include_in_schema=False)
+@app.get(LEGACY_CLI_ROUTE, operation_id="compat_cli_catalog", include_in_schema=False)
 async def cli_catalog(verbose: bool = False):
     return get_catalog_payload(verbose=verbose)
 
 
-@app.post("/api/cli", operation_id="cli_dispatch", include_in_schema=False)
+@app.post(CLI_ROUTE, operation_id="cli_dispatch", include_in_schema=False)
+@app.post(
+    ROOT_CLI_ROUTE, operation_id="compat_root_cli_dispatch", include_in_schema=False
+)
+@app.post(
+    LEGACY_CLI_ROUTE, operation_id="compat_cli_dispatch", include_in_schema=False
+)
 async def cli_dispatch(request: Request):
     try:
         payload = await request.json()
@@ -646,6 +659,8 @@ def main():
     print(f"Starting TMF620 MCP server on http://{host}:{port}")
     print(f"TMF620 API URL: {resolved_config['tmf620_api']['url']}")
     print(f"Health check: http://{host}:{port}/health")
+    print(f"HTTP CLI API: http://{host}:{port}{CLI_ROUTE}")
+    print(f"HTTP CLI API alias: http://{host}:{port}{ROOT_CLI_ROUTE}")
     print(f"API Documentation: http://{host}:{port}/docs")
 
     uvicorn.run(app, host=host, port=port)

@@ -1,8 +1,8 @@
-import json
+﻿import json
 import subprocess
 import sys
 
-CLI_URL = "http://localhost:7701/api/cli"
+CLI_URL = "http://localhost:7701/cli/tmf620/catalogmgt"
 HEALTH_URL = "http://localhost:7701/health"
 passed = 0
 failed = 0
@@ -84,6 +84,9 @@ def cli_catalog_get():
     assert data["status"] == "ok"
     assert data["interface"] == "cli"
     assert data["version"] == "1.0"
+    assert data["service"] == "tmf620"
+    assert data["namespace"] == "tmf620/catalogmgt"
+    assert data["canonical_endpoint"] == "/cli/tmf620/catalogmgt"
     assert len(data["commands"]) > 0
     names = [c["name"] for c in data["commands"]]
     for expected in ["health", "config", "catalog", "offering", "category", "hub"]:
@@ -488,7 +491,7 @@ if __name__ == "__main__":
 
     print("\n-- Health & Discovery --")
     test("GET /health returns healthy", health_get)
-    test("GET /api/cli returns command catalog", cli_catalog_get)
+    test("GET /cli/tmf620/catalogmgt returns command catalog", cli_catalog_get)
     test("POST help (no args) returns catalog", help_via_post_no_args)
     test("POST help for specific command", help_specific_command)
     test("POST help for group command", help_group_command)
@@ -566,3 +569,5 @@ if __name__ == "__main__":
             print(f"  - {name}: {err}")
 
     sys.exit(1 if failed else 0)
+
+

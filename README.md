@@ -1,4 +1,4 @@
-# TMF620 CLI vs MCP
+﻿# TMF620 CLI vs MCP
 
 This repo exposes the TMF620 command layer through two interfaces:
 
@@ -9,7 +9,7 @@ The CLI API is the cheaper discovery path for agents that only need one command 
 
 The practical reasons to keep both are:
 
-- compact discovery: agents can start with `GET /api/cli` instead of ingesting the full MCP tool list up front
+- compact discovery: agents can start with `GET /cli/tmf620/catalogmgt` instead of ingesting the full MCP tool list up front
 - progressive help: agents can expand one command branch at a time with `help`
 - stronger MCP contracts: MCP tools now expose explicit schemas instead of a generic `args` object
 - simpler automation: `curl` works well for both humans and agents, especially when the command surface is already structured
@@ -23,7 +23,7 @@ The current token benchmark numbers are:
 
 Shared CLI discovery numbers:
 
-- compact `GET /api/cli`: `254` tokens
+- compact `GET /cli/tmf620/catalogmgt`: `254` tokens
 - compact group help: `125` tokens
 - leaf help: `245` tokens
 - compact catalog + group help: `379` tokens
@@ -79,7 +79,8 @@ File: `tmf620_commands.py`
 File: `tmf620_mcp_server.py`
 
 - FastAPI + the official MCP SDK (`FastMCP`)
-- exposes `/api/cli` for the HTTP CLI API pattern
+- exposes `/cli/tmf620/catalogmgt` as the primary HTTP CLI endpoint
+- keeps `/cli` and `/api/cli` as compatibility aliases
 - exposes explicit MCP tools for MCP-capable agents
 - delegates HTTP CLI requests into `tmf620_commands.py`
 - delegates MCP tools into the shared command layer
@@ -96,7 +97,7 @@ The container exposes:
 
 - mock API at `http://localhost:8801/tmf-api/productCatalogManagement/v5`
 - MCP transport at `http://localhost:7701/mcp`
-- HTTP CLI API at `http://localhost:7701/api/cli`
+- HTTP CLI API at `http://localhost:7701/cli/tmf620/catalogmgt`
 
 The container uses environment overrides rather than rewriting config files. Set them in `docker-compose.yml`, or use a `.env` file with Docker Compose:
 
@@ -129,15 +130,15 @@ http://localhost:8801/tmf-api/productCatalogManagement/v5
 ### Use the HTTP CLI API
 
 ```bash
-curl http://localhost:7701/api/cli
-curl "http://localhost:7701/api/cli?verbose=true"
-curl -X POST http://localhost:7701/api/cli \
+curl http://localhost:7701/cli/tmf620/catalogmgt
+curl "http://localhost:7701/cli/tmf620/catalogmgt?verbose=true"
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"catalog list"}}'
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"catalog list","args":{"lifecycle_status":"Active","limit":5}}'
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"catalog get","args":{"catalog_id":"cat-001"}}'
 ```
@@ -157,8 +158,8 @@ http://localhost:7701
 HTTP CLI API endpoints:
 
 ```text
-GET  http://localhost:7701/api/cli
-POST http://localhost:7701/api/cli
+GET  http://localhost:7701/cli/tmf620/catalogmgt
+POST http://localhost:7701/cli/tmf620/catalogmgt
 ```
 
 ## Configuration
@@ -188,42 +189,42 @@ You can also override the config path with `TMF620_CONFIG_PATH`.
 
 ```bash
 # Discovery
-curl http://localhost:7701/api/cli
-curl "http://localhost:7701/api/cli?verbose=true"
-curl -X POST http://localhost:7701/api/cli \
+curl http://localhost:7701/cli/tmf620/catalogmgt
+curl "http://localhost:7701/cli/tmf620/catalogmgt?verbose=true"
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"offering patch"}}'
 
 # Read/list commands
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"category list","args":{"limit":5}}'
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"catalog list","args":{"lifecycle_status":"Active","limit":5}}'
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"offering list","args":{"catalog_id":"cat-001","limit":10,"offset":5}}'
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"price get","args":{"price_id":"pop-001"}}'
 
 # Create/patch commands use JSON bodies because TMF620 resource payloads are wide
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"catalog create","args":{"body":{"name":"Business Catalog","lifecycleStatus":"Active"}}}'
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"offering patch","args":{"offering_id":"po-001","body":{"description":"Updated description"}}}'
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"hub create","args":{"body":{"callback":"https://example.com/hooks/tmf620","query":"eventType=ProductOfferingCreateEvent"}}}'
 
 # Delete commands
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"category delete","args":{"category_id":"category-001"}}'
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"hub delete","args":{"hub_id":"hub-001"}}'
 ```
@@ -260,14 +261,14 @@ The HTTP CLI API and MCP server share the same `config.json` and command layer, 
 For machine-readable discovery, use:
 
 ```bash
-curl http://localhost:7701/api/cli
-curl "http://localhost:7701/api/cli?verbose=true"
-curl -X POST http://localhost:7701/api/cli \
+curl http://localhost:7701/cli/tmf620/catalogmgt
+curl "http://localhost:7701/cli/tmf620/catalogmgt?verbose=true"
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"offering patch"}}'
 ```
 
-`GET /api/cli` now returns the compact catalog by default. Use `verbose=true` only when you actually need the richer top-level payload. Per-command help remains the preferred way to expand one branch at a time.
+`GET /cli/tmf620/catalogmgt` now returns the compact catalog by default. Use `verbose=true` only when you actually need the richer top-level payload. Per-command help remains the preferred way to expand one branch at a time.
 Group-level help is also compact by default. Leaf-command help returns the detailed argument schema.
 
 ## HTTP CLI API
@@ -279,22 +280,22 @@ For agents, this is the canonical machine-facing command surface.
 Discovery:
 
 ```bash
-curl http://localhost:7701/api/cli
+curl http://localhost:7701/cli/tmf620/catalogmgt
 ```
 
 Verbose discovery:
 
 ```bash
-curl "http://localhost:7701/api/cli?verbose=true"
+curl "http://localhost:7701/cli/tmf620/catalogmgt?verbose=true"
 ```
 
 Per-command help:
 
 ```bash
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"offering"}}'
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"catalog list"}}'
 ```
@@ -302,7 +303,7 @@ curl -X POST http://localhost:7701/api/cli \
 Verbose catalog via `help`:
 
 ```bash
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"verbose":true}}'
 ```
@@ -310,7 +311,7 @@ curl -X POST http://localhost:7701/api/cli \
 Verbose group help:
 
 ```bash
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"help","args":{"command":"offering","verbose":true}}'
 ```
@@ -318,7 +319,7 @@ curl -X POST http://localhost:7701/api/cli \
 Invoke:
 
 ```bash
-curl -X POST http://localhost:7701/api/cli \
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"catalog list","args":{"limit":1}}'
 ```
@@ -326,7 +327,7 @@ curl -X POST http://localhost:7701/api/cli \
 Stream:
 
 ```bash
-curl -N -X POST http://localhost:7701/api/cli \
+curl -N -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
   -d '{"command":"catalog list","args":{"limit":1},"stream":true}'
 ```
@@ -350,8 +351,8 @@ Import `TMF620Client` from `tmf620_core.py` directly for Python usage.
 curl http://localhost:8801/tmf-api/productCatalogManagement/v5/productCatalog
 
 # HTTP CLI API
-curl http://localhost:7701/api/cli
-curl -X POST http://localhost:7701/api/cli -H "Content-Type: application/json" -d '{"command":"catalog list","args":{}}'
+curl http://localhost:7701/cli/tmf620/catalogmgt
+curl -X POST http://localhost:7701/cli/tmf620/catalogmgt -H "Content-Type: application/json" -d '{"command":"catalog list","args":{}}'
 
 # MCP server
 curl http://localhost:7701/health
@@ -375,7 +376,7 @@ Start the stack first:
 
 It measures:
 
-- compact `GET /api/cli` catalog
+- compact `GET /cli/tmf620/catalogmgt` catalog
 - compact group help and leaf help from `tmf620_commands.py`
 - raw MCP tool objects from the live MCP server
 - OpenAI-style wrapped MCP tool payloads of the form `{"type":"function","function":{...}}`
@@ -392,7 +393,7 @@ uv run tmf620-benchmark latency 30 --warmup 1
 
 This benchmark measures the end-user path:
 
-- CLI: `GET /api/cli`, `help`, then command invoke
+- CLI: `GET /cli/tmf620/catalogmgt`, `help`, then command invoke
 - MCP: `list_tools`, then `tools/call`
 
 Use `--cold-start` when you want a fresh MCP connection per iteration:
@@ -424,3 +425,5 @@ Console scripts exposed by `pyproject.toml`:
 - `tmf620-mock-server`
 - `tmf620-mcp-server`
 - `tmf620-benchmark`
+
+

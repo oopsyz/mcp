@@ -1,9 +1,9 @@
-import json
+﻿import json
 import subprocess
 import sys
 
 BASE = "http://localhost:7701"
-CLI_URL = f"{BASE}/api/cli"
+CLI_URL = f"{BASE}/cli/tmf620/catalogmgt"
 
 
 def _post_raw(url: str, payload: dict) -> tuple[dict, str]:
@@ -262,3 +262,5 @@ print(
     f"  CLI net savings:    ~{MCP_TOOL_TOKENS - CLI_TOOL_TOKENS:,} tokens/turn (tool def savings >> envelope cost)"
 )
 print(f"{'=' * 95}")
+
+

@@ -100,7 +100,7 @@ If you are building before this extension is standardized:
 - keep each service individually conformant to `SPEC.md`
 - do not overload single-service node IDs with undocumented cross-service meaning
 - use explicit local routing metadata if you experiment with federation
-- descriptive deployment prefixes such as `/tmf620/catalogmgt` MAY help humans or agents find a service entrypoint, but they SHOULD be treated only as bootstrap hints
+- descriptive deployment prefixes such as `/cli/tmf620/catalogmgt` MAY help humans or agents find a service entrypoint, but they SHOULD be treated only as bootstrap hints
 - avoid designs where a client must reverse-engineer service ownership from command names alone
 - avoid designs where a client must reverse-engineer service ownership from URI naming alone
 
@@ -136,3 +136,251 @@ Use this extension draft as well when:
 
 - you are combining multiple services
 - you need explicit namespace or federation behavior
+
+---
+
+## 8. Federation and Routing Model
+
+### 8.1 Objective
+
+Define a deterministic and scalable mechanism for:
+
+- locating CLI endpoints across ODA components
+- routing agent requests to the correct domain or component
+- reducing ambiguity in multi-component environments
+- complementing semantic discovery with structural addressing
+
+### 8.2 Namespace-Based Routing
+
+A practical federation pattern is to expose each CLI instance under a structured URI namespace derived from:
+
+- TMF API identifier
+- business or domain context
+
+Examples:
+
+```text
+/cli/tmf620/catalogmgt
+/cli/tmf622/productorder
+/cli/tmf641/serviceorder
+```
+
+These prefixes can make service entrypoints easier to locate, but they do not replace explicit routing metadata, service ownership metadata, or discovery-time identification.
+
+Within a namespace, the CLI contract remains the same as the core spec:
+
+```text
+/cli/<namespace>
+```
+
+### 8.3 Design Principle
+
+Namespace is the externalized identity of an ODA component capability.
+
+In this model, each namespace:
+
+- maps to a specific ODA component or tightly bounded domain capability
+- represents a bounded execution context
+- acts as a routing anchor for agents
+
+To remain compatible with this draft's earlier constraints, the namespace SHOULD be reinforced by explicit service identity and routing metadata rather than treated as the only source of truth.
+
+### 8.4 Routing Flow
+
+```text
+Agent
+  ->
+Select namespace or service target
+  ->
+Discover commands within that namespace
+  ->
+Invoke command
+  ->
+ODA component execution
+```
+
+The selection step should be deterministic and inspectable. Implementations SHOULD be able to explain why a request was routed to a given namespace.
+
+### 8.5 Hybrid Discovery Model
+
+Federation can combine two complementary mechanisms.
+
+#### 8.5.1 Structural Routing
+
+- namespace selection such as `/cli/tmf620/*` or `/cli/tmf622/*`
+- deterministic and predictable routing
+- reduced ambiguity across services
+
+#### 8.5.2 Semantic Discovery
+
+- vector search, intent matching, or other semantic narrowing
+- used before or within a constrained namespace
+- assists command selection without replacing explicit routing
+
+One practical interaction pattern is:
+
+```text
+Intent
+  ->
+Semantic narrowing (optional)
+  ->
+Namespace selection (deterministic)
+  ->
+Command discovery
+  ->
+Invocation
+```
+
+### 8.6 Benefits
+
+#### 8.6.1 Deterministic Federation
+
+- reduces reliance on unconstrained global search
+- enables predictable routing behavior
+
+#### 8.6.2 Reduced Command Collision
+
+- commands are scoped per namespace
+- ambiguity across domains is reduced
+
+#### 8.6.3 Alignment with TMF Standards
+
+- preserves TMF API identity such as `TMF620` or `TMF622`
+- maintains traceability to OpenAPI contracts and ODA capabilities
+
+#### 8.6.4 Improved Agent Efficiency
+
+- smaller discovery space
+- lower token usage
+- faster reasoning
+
+### 8.7 Governance Integration
+
+Namespaces can also serve as authorization boundaries.
+
+Example:
+
+```text
+Agent A:
+  Allowed -> /cli/tmf620/*
+  Denied  -> /cli/tmf622/*
+```
+
+This supports:
+
+- domain isolation
+- fine-grained access control
+- secure multi-agent environments
+
+### 8.8 Relationship to ODA Components
+
+Each namespace SHOULD correspond to:
+
+- one ODA component
+- or one tightly bounded capability within a domain
+
+This helps preserve:
+
+- clear ownership
+- minimal cross-component ambiguity
+- consistent execution boundaries
+
+### 8.9 Federation Control Requirements
+
+Namespace routing alone is not sufficient. A federated implementation should also support:
+
+- service ownership resolution
+- explicit routing rules
+- command provenance tracking
+- audit of routing decisions
+
+These controls support auditability and deterministic behavior expectations.
+
+### 8.10 Namespace Design Guidelines
+
+#### 8.10.1 Use TMF API Identity Plus a Domain Hint
+
+Preferred:
+
+```text
+/cli/tmf620/catalog
+/cli/tmf622/productorder
+```
+
+Avoid opaque or overly technical naming where possible.
+
+#### 8.10.2 Keep Names Stable
+
+- avoid frequent namespace changes
+- treat the namespace as an external contract
+
+#### 8.10.3 Avoid Version in the URI When Possible
+
+Avoid exposing prefixes such as:
+
+```text
+/cli/tmf622/v4
+```
+
+When feasible, version handling should be internal to the component so federation routing stays stable for agents.
+
+#### 8.10.4 Maintain Business Readability
+
+Namespaces should be:
+
+- understandable by humans
+- meaningful to agents
+- aligned with business capabilities
+
+### 8.11 Multi-Component Domain Considerations
+
+Some domains span multiple TMF APIs. Two patterns are common.
+
+Option A: API-aligned namespaces
+
+```text
+/cli/tmf622/productorder
+/cli/tmf641/serviceorder
+```
+
+Option B: aggregated domain namespaces
+
+```text
+/cli/order/*
+```
+
+Recommendation:
+
+- start with API-aligned namespaces for clarity and traceability
+- introduce aggregated namespaces only when strong domain abstraction is required
+
+### 8.12 Discovery Contract Per Namespace
+
+Each namespace should expose the same CLI discovery contract as the core spec.
+
+Examples:
+
+```text
+GET  /cli/<namespace>
+POST /cli/<namespace> {"command":"help"}
+```
+
+The response can then describe:
+
+- available commands
+- summaries and descriptions
+- input arguments and constraints
+- service or namespace identity metadata
+
+This preserves progressive discovery and agent self-navigation while keeping the per-namespace contract uniform.
+
+### 8.13 Positioning
+
+Namespace-based routing can provide the structural backbone for federation, while semantic discovery adds flexibility within controlled boundaries.
+
+This approach aims to preserve:
+
+- deterministic routing
+- strong governance
+- alignment with the ODA component model
+- agent-optimized interaction

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import asyncio
@@ -20,7 +20,7 @@ from tmf620_commands import _tool_name, get_catalog_payload, get_command_help_pa
 
 
 BASE = os.environ.get("TMF620_BASE_URL", "http://localhost:7701").rstrip("/")
-CLI_URL = f"{BASE}/api/cli"
+CLI_URL = f"{BASE}/cli/tmf620/catalogmgt"
 DEFAULT_ENCODING = "cl100k_base"
 DEFAULT_ITERATIONS = 50
 DEFAULT_OUTPUT = "pretty"
@@ -784,3 +784,5 @@ def main(argv: list[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
+
