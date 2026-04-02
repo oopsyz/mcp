@@ -97,6 +97,7 @@ Each service in `registry.md` follows this structure:
 - MCP: <mcp endpoint url>
 - Handles: <what this service does, natural language>
 - Use when: <when an agent should pick this service>
+- Dependencies: <comma-separated full service IDs (e.g. tmf620/catalogmgt), or "none">
 - Owner: <team or person>
 - Tags: <comma-separated tags>
 ```
@@ -104,17 +105,20 @@ Each service in `registry.md` follows this structure:
 Example:
 
 ```markdown
-## tmf620/catalogmgt
-- URL: http://localhost:7701
-- CLI: /cli/tmf620/catalogmgt
-- MCP: http://localhost:7701/mcp
-- Handles: product catalogs, product specifications, product offerings, categories, pricing, import/export jobs
-- Use when: agent needs to browse, create, update, or manage products, catalogs, offerings, specifications, or pricing
-- Owner: platform-team
-- Tags: catalog, product, offering, specification, pricing, tmf620
+## tmf622/ordermgt
+- URL: http://localhost:7702
+- CLI: /cli/tmf622/ordermgt
+- MCP: http://localhost:7702/mcp
+- Handles: product orders, order items, order lifecycle, cancellations, returns
+- Use when: agent needs to place, track, modify, or cancel a product order
+- Dependencies: tmf620/catalogmgt, tmf632/partymgt
+- Owner: order-team
+- Tags: order, fulfillment, tmf622
 ```
 
-The `Handles` and `Use when` fields are the most important. Write them in the language a client agent would think in, not in API jargon.
+The `Handles` and `Use when` fields are the most important — write them in the language a client agent would think in, not in API jargon.
+
+The `Dependencies` field encodes the inter-service knowledge that only the registry has. When the resolver sees `Dependencies: tmf620/catalogmgt, tmf632/partymgt`, it tells the calling agent: *"You will need a ProductOfferingRef from tmf620 and a PartyRef from tmf632 before you can use this service."* The agent does not need to know this upfront — the resolver provides it as part of the resolve response.
 
 ---
 
@@ -165,7 +169,7 @@ curl -s -X POST http://localhost:7700/cli/registry \
   "status": "ok",
   "command": "resolve",
   "result": {
-    "query": "I need to manage product orders",
+    "query": "I want to purchase a 5G data plan",
     "matches": [
       {
         "id": "tmf622/ordermgt",
@@ -173,7 +177,20 @@ curl -s -X POST http://localhost:7700/cli/registry \
         "cli": "/cli/tmf622/ordermgt",
         "mcp": "http://localhost:7702/mcp",
         "confidence": 0.95,
-        "reason": "handles product orders and order lifecycle"
+        "reason": "Primary tool for creating product orders.",
+        "prerequisites": [
+          { "id": "tmf620/catalogmgt", "note": "Requires a ProductOfferingRef — query tmf620/catalogmgt to find available 5G plans." },
+          { "id": "tmf632/partymgt", "note": "Requires a RelatedPartyRef — query tmf632/partymgt to get the customer party ID." }
+        ]
+      },
+      {
+        "id": "tmf620/catalogmgt",
+        "url": "http://localhost:7701",
+        "cli": "/cli/tmf620/catalogmgt",
+        "mcp": "http://localhost:7701/mcp",
+        "confidence": 0.78,
+        "reason": "Use to find available 5G offerings and their IDs before placing an order.",
+        "prerequisites": []
       }
     ],
     "resolved_by": "opencode"
@@ -200,7 +217,7 @@ Note: The `note` field provides guidance when no matches are found. The response
 
 **Fallback response** (opencode serve unavailable):
 
-If opencode serve is not running, the registry falls back to lightweight keyword scoring:
+The fallback is a degraded, temporary mode — keyword scoring only, no LLM reasoning. Check `resolved_by` before relying on `prerequisites`:
 
 ```json
 {
@@ -226,6 +243,17 @@ If opencode serve is not running, the registry falls back to lightweight keyword
   }
 }
 ```
+
+**Shape contract gated on `resolved_by`:**
+
+| Field | `resolved_by: opencode` | `resolved_by: fallback` |
+| --- | --- | --- |
+| `matches[].confidence` | float 0–1 | absent (`score` instead) |
+| `matches[].reason` | present | absent |
+| `matches[].prerequisites` | populated by LLM | **absent** |
+| `total_services` / `returned` | absent | present |
+
+`prerequisites` is only present on `resolved_by: opencode` responses. It is not synthesized in the fallback — dependency notes require LLM reasoning. Clients must guard on `resolved_by` before accessing it.
 
 **With full registry** (fallback + `include_raw=true`):
 

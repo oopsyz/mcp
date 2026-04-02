@@ -53,9 +53,48 @@ def core_resolve():
 
     result = cmd_resolve("I need to manage product catalogs")
     assert "query" in result
-    assert "registry_content" in result
-    assert "services" in result
-    assert "instruction" in result
+    assert "matches" in result
+    assert isinstance(result["matches"], list)
+    assert "total_services" in result
+    assert "returned" in result
+
+
+def core_resolve_dependencies():
+    from registry_core import cmd_register, cmd_resolve, cmd_unregister, parse_registry
+
+    tmp = Path(tempfile.mkdtemp()) / "registry.md"
+    tmp.write_text("# Service Registry\n\n")
+    svc_a = {
+        "id": "test/serviceA",
+        "url": "http://localhost:9001",
+        "cli": "/cli/test/serviceA",
+        "handles": "widgets",
+        "use_when": "testing widgets",
+        "dependencies": "test/serviceB",
+        "owner": "test",
+        "tags": ["widget"],
+    }
+    svc_b = {
+        "id": "test/serviceB",
+        "url": "http://localhost:9002",
+        "cli": "/cli/test/serviceB",
+        "handles": "gadgets",
+        "use_when": "testing gadgets",
+        "dependencies": "none",
+        "owner": "test",
+        "tags": ["gadget"],
+    }
+    cmd_register(svc_a, tmp)
+    cmd_register(svc_b, tmp)
+    services = parse_registry(tmp)
+    ids = [s["id"] for s in services]
+    assert "test/serviceA" in ids
+    assert "test/serviceB" in ids
+    svc_a_parsed = next(s for s in services if s["id"] == "test/serviceA")
+    assert svc_a_parsed.get("dependencies") == "test/serviceB"
+    result = cmd_resolve("widgets", tmp)
+    assert "matches" in result
+    shutil.rmtree(tmp.parent)
 
 
 def core_register_and_unregister():
@@ -142,7 +181,7 @@ def http_resolve():
         CLI,
         json={
             "command": "resolve",
-            "args": {"query": "I need to manage product orders"},
+            "args": {"query": "I need to manage product catalogs"},
         },
     )
     assert r.status_code == 200
@@ -150,9 +189,59 @@ def http_resolve():
     assert data["status"] == "ok"
     result = data["result"]
     assert "query" in result
-    assert "registry_content" in result
-    assert "services" in result
-    assert "instruction" in result
+    assert "matches" in result
+    assert isinstance(result["matches"], list)
+    assert "resolved_by" in result
+    assert result["resolved_by"] in ("opencode", "fallback")
+
+
+def http_resolve_prerequisites_shape():
+    """prerequisites shape is gated on resolved_by.
+
+    opencode path: each match has prerequisites list; each entry has id and note.
+    fallback path: prerequisites is absent — not synthesized without LLM.
+    """
+    r = requests.post(
+        CLI,
+        json={
+            "command": "resolve",
+            "args": {"query": "I need to manage product catalogs"},
+        },
+    )
+    assert r.status_code == 200
+    result = r.json()["result"]
+    resolved_by = result.get("resolved_by")
+
+    if resolved_by == "opencode":
+        for match in result.get("matches", []):
+            assert "prerequisites" in match, (
+                f"opencode match missing prerequisites: {match.get('id')}"
+            )
+            assert isinstance(match["prerequisites"], list)
+            for prereq in match["prerequisites"]:
+                assert "id" in prereq, f"prerequisite missing 'id': {prereq}"
+                assert "note" in prereq, f"prerequisite missing 'note': {prereq}"
+    elif resolved_by == "fallback":
+        for match in result.get("matches", []):
+            assert "prerequisites" not in match, (
+                f"fallback must not synthesize prerequisites: {match.get('id')}"
+            )
+
+
+def http_resolve_no_registry_dump():
+    """Resolve must never return registry_content unless explicitly requested via fallback."""
+    r = requests.post(
+        CLI,
+        json={
+            "command": "resolve",
+            "args": {"query": "I need to manage product catalogs"},
+        },
+    )
+    result = r.json()["result"]
+    if result.get("resolved_by") == "opencode":
+        assert "registry_content" not in result, (
+            "LLM path must not return full registry_content"
+        )
 
 
 def http_register_and_unregister():
@@ -279,6 +368,7 @@ if __name__ == "__main__":
     test("core get", core_get)
     test("core get not found", core_get_not_found)
     test("core resolve", core_resolve)
+    test("core resolve dependencies parsed", core_resolve_dependencies)
     test("core register + unregister lifecycle", core_register_and_unregister)
     print("\n-- HTTP server (port 7700) --")
     test("GET /health", http_health)
@@ -287,6 +377,8 @@ if __name__ == "__main__":
     test("POST get", http_get)
     test("POST get not found", http_get_not_found)
     test("POST resolve", http_resolve)
+    test("POST resolve prerequisites shape", http_resolve_prerequisites_shape)
+    test("POST resolve no registry dump", http_resolve_no_registry_dump)
     test("POST register + unregister lifecycle", http_register_and_unregister)
     test("POST register update existing", http_update_existing)
     print("\n-- Error handling --")

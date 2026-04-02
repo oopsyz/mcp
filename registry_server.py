@@ -66,13 +66,15 @@ to the most relevant registered service(s).
 
 Return ONLY a valid JSON object — no markdown fences, no explanation, no other text:
 
-{"matches":[{"id":"service-id","url":"http://...","cli":"/cli/...","mcp":"http://.../mcp","confidence":0.95,"reason":"why this matches"}]}
+{"matches":[{"id":"service-id","url":"http://...","cli":"/cli/...","mcp":"http://.../mcp","confidence":0.95,"reason":"one sentence: why this service matches the query","prerequisites":[{"id":"dep-service-id","note":"one sentence: what you need from this dependency and why"}]}]}
 
 Rules:
 - confidence: float 0.0–1.0
 - Only include services with confidence > 0.5
 - Order by confidence descending
 - If nothing matches: {"matches":[]}
+- prerequisites: derive from the service's "dependencies" field. For each dependency, write one sentence explaining what the caller needs from it. If dependencies is "none" or empty, use [].
+- prerequisites notes must describe WHAT to get (e.g. "Requires a ProductOfferingRef"), not HOW to get it (no step-by-step sequences)
 - ONLY output the JSON object, nothing else"""
 
 
@@ -560,7 +562,8 @@ async def cli_dispatch(request: Request):
                     "or try a different query."
                 )
         else:
-            # Fallback: opencode unavailable, use keyword scoring
+            # Fallback: opencode unavailable, use keyword scoring.
+            # prerequisites is not present — dependency notes require LLM reasoning.
             result = await asyncio.to_thread(
                 cmd_resolve, query, limit=limit, include_raw=include_raw
             )
