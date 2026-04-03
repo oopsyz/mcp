@@ -97,9 +97,11 @@ Files: `registry_core.py`, `registry_server.py`, `registry.md`
 - Markdown-backed, agent-facing registry for service discovery
 - exposes `/cli/registry` for list, get, resolve, register, unregister, and setstatus
 - uses `registry.md` as the single source of truth
-- supports semantic resolution from natural language service needs to service IDs
-- pairs with `.opencode/agents/agent/service-registry.md` for natural-language
-  lookup and routing when the target service is not known in advance
+- `resolve` is LLM-powered via opencode serve (falls back to keyword scoring if unavailable); set `OPENCODE_URL` to point at your opencode instance (default `http://127.0.0.1:4096`)
+- resolve response includes `prerequisites` — inter-service dependencies derived from the `Dependencies` field in `registry.md` — so agents know what other services to query before calling the matched service
+- `setstatus` lets any caller (agent, monitor, operator) mark a service as `live`, `degraded`, or `maintenance`; status is surfaced in both `list` and `resolve`
+- pairs with `.opencode/agents/agent/service-registry.md` for natural-language lookup and routing when the target service is not known in advance
+- implements the registry pattern described in `SPEC_FEDERATION_EXTENSION.md` section 8.14
 
 Use the registry agent when you need to turn a natural-language intent into the
 right service first, then jump to that service's own CLI discovery surface.
@@ -187,6 +189,12 @@ POST http://localhost:7701/cli/tmf620/catalogmgt
 uv run registry-server
 ```
 
+To enable LLM-powered resolve, point the registry at a running opencode instance:
+
+```bash
+OPENCODE_URL=http://127.0.0.1:4096 uv run registry-server
+```
+
 Default registry URLs:
 
 ```text
@@ -196,7 +204,8 @@ http://localhost:7700/cli/registry
 
 Registry data lives in `registry.md`. The registry agent is useful when a client
 only has a description like "manage product orders" and needs the correct service
-before calling that service's own CLI API.
+before calling that service's own CLI API. If opencode is not running, resolve
+falls back to keyword scoring automatically.
 
 ## Configuration
 
