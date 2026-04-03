@@ -97,6 +97,114 @@ def core_resolve_dependencies():
     shutil.rmtree(tmp.parent)
 
 
+def core_setstatus():
+    from registry_core import cmd_register, cmd_setstatus, cmd_get, cmd_list
+
+    tmp = Path(tempfile.mkdtemp()) / "registry.md"
+    tmp.write_text("# Service Registry\n\n")
+    svc = {
+        "id": "test/status",
+        "url": "http://localhost:9999",
+        "cli": "/cli/test/status",
+        "handles": "status testing",
+        "use_when": "testing",
+        "owner": "test",
+        "tags": ["test"],
+    }
+    cmd_register(svc, tmp)
+
+    # default status is "live" in list
+    lst = cmd_list(tmp)
+    assert lst["services"][0]["status"] == "live"
+
+    # set to degraded
+    r = cmd_setstatus("test/status", "degraded", tmp)
+    assert r["status"] == "updated"
+    assert r["previous"] == "live"
+    assert r["current"] == "degraded"
+
+    # persisted in get
+    got = cmd_get("test/status", tmp)
+    assert got["service"]["status"] == "degraded"
+
+    # invalid status rejected
+    r2 = cmd_setstatus("test/status", "broken", tmp)
+    assert "error" in r2
+
+    # not found
+    r3 = cmd_setstatus("test/missing", "live", tmp)
+    assert "error" in r3
+
+    shutil.rmtree(tmp.parent)
+
+
+def core_register_preserves_status():
+    from registry_core import cmd_register, cmd_setstatus, cmd_get
+
+    tmp = Path(tempfile.mkdtemp()) / "registry.md"
+    tmp.write_text("# Service Registry\n\n")
+    svc = {
+        "id": "test/preserve",
+        "url": "http://localhost:9995",
+        "cli": "/cli/test/preserve",
+        "handles": "preserve testing",
+        "use_when": "testing",
+        "owner": "test",
+        "tags": ["test"],
+    }
+    cmd_register(svc, tmp)
+    cmd_setstatus("test/preserve", "degraded", tmp)
+
+    # update metadata without status field — status must survive
+    svc["handles"] = "updated handles"
+    cmd_register(svc, tmp)
+    got = cmd_get("test/preserve", tmp)
+    assert got["service"]["status"] == "degraded", (
+        "register must not reset status when caller omits it"
+    )
+
+    # explicit status in payload overrides
+    svc["status"] = "live"
+    cmd_register(svc, tmp)
+    got = cmd_get("test/preserve", tmp)
+    assert got["service"]["status"] == "live"
+
+    shutil.rmtree(tmp.parent)
+
+
+def core_resolve_includes_status():
+    from registry_core import cmd_register, cmd_setstatus, cmd_resolve
+
+    tmp = Path(tempfile.mkdtemp()) / "registry.md"
+    tmp.write_text("# Service Registry\n\n")
+    svc = {
+        "id": "test/resolvestatus",
+        "url": "http://localhost:9994",
+        "cli": "/cli/test/resolvestatus",
+        "handles": "resolve status testing",
+        "use_when": "testing",
+        "owner": "test",
+        "tags": ["test"],
+    }
+    cmd_register(svc, tmp)
+
+    # no explicit status — should default to live in resolve
+    result = cmd_resolve("resolve status testing", tmp)
+    assert result["matches"], "expected at least one match"
+    assert result["matches"][0]["status"] == "live", (
+        "resolve must default status to live when absent"
+    )
+
+    # set degraded — must appear in resolve
+    cmd_setstatus("test/resolvestatus", "degraded", tmp)
+    result = cmd_resolve("resolve status testing", tmp)
+    assert result["matches"][0]["status"] == "degraded", (
+        "resolve must surface current status"
+    )
+
+    shutil.rmtree(tmp.parent)
+
+
 def core_register_and_unregister():
     from registry_core import cmd_register, cmd_unregister, cmd_list
 
@@ -142,9 +250,9 @@ def http_discovery():
     assert data["interface"] == "cli"
     assert data["version"] == "1.0"
     assert data["service"] == "registry"
-    assert len(data["commands"]) == 5
+    assert len(data["commands"]) == 6
     names = [c["name"] for c in data["commands"]]
-    for expected in ["list", "get", "resolve", "register", "unregister"]:
+    for expected in ["list", "get", "resolve", "register", "unregister", "setstatus"]:
         assert expected in names, f"Missing command: {expected}"
 
 
@@ -335,6 +443,45 @@ def http_error_envelope():
         assert data.get("version") == "1.0", f"{label}: missing version"
 
 
+def http_setstatus():
+    svc = {
+        "id": "test/statushttp",
+        "url": "http://localhost:9996",
+        "cli": "/cli/test/statushttp",
+        "handles": "http status testing",
+        "use_when": "testing",
+        "owner": "test",
+        "tags": ["test"],
+    }
+    requests.post(CLI, json={"command": "register", "args": {"body": svc}})
+
+    # set to maintenance
+    r = requests.post(
+        CLI,
+        json={"command": "setstatus", "args": {"service_id": "test/statushttp", "status": "maintenance"}},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["status"] == "ok"
+    assert data["result"]["current"] == "maintenance"
+    assert data["result"]["previous"] == "live"
+
+    # surfaced in list
+    r = requests.post(CLI, json={"command": "list"})
+    entries = {s["id"]: s for s in r.json()["result"]["services"]}
+    assert entries["test/statushttp"]["status"] == "maintenance"
+
+    # invalid status
+    r = requests.post(
+        CLI,
+        json={"command": "setstatus", "args": {"service_id": "test/statushttp", "status": "broken"}},
+    )
+    assert r.status_code == 200
+    assert "error" in r.json()["result"]
+
+    requests.post(CLI, json={"command": "unregister", "args": {"service_id": "test/statushttp"}})
+
+
 def http_update_existing():
     svc = {
         "id": "test/update",
@@ -369,6 +516,9 @@ if __name__ == "__main__":
     test("core get not found", core_get_not_found)
     test("core resolve", core_resolve)
     test("core resolve dependencies parsed", core_resolve_dependencies)
+    test("core setstatus", core_setstatus)
+    test("core register preserves status", core_register_preserves_status)
+    test("core resolve includes status", core_resolve_includes_status)
     test("core register + unregister lifecycle", core_register_and_unregister)
     print("\n-- HTTP server (port 7700) --")
     test("GET /health", http_health)
@@ -380,6 +530,7 @@ if __name__ == "__main__":
     test("POST resolve prerequisites shape", http_resolve_prerequisites_shape)
     test("POST resolve no registry dump", http_resolve_no_registry_dump)
     test("POST register + unregister lifecycle", http_register_and_unregister)
+    test("POST setstatus", http_setstatus)
     test("POST register update existing", http_update_existing)
     print("\n-- Error handling --")
     test("invalid JSON", http_invalid_json)

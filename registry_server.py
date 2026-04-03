@@ -23,10 +23,12 @@ from starlette.responses import JSONResponse
 
 from registry_core import (
     REGISTRY_FILE,
+    VALID_STATUSES,
     cmd_get,
     cmd_list,
     cmd_register,
     cmd_resolve,
+    cmd_setstatus,
     cmd_unregister,
     parse_registry,
     write_registry,
@@ -354,6 +356,46 @@ COMMANDS: dict[str, dict[str, Any]] = {
             },
         ],
     },
+    "setstatus": {
+        "summary": "Update the status of a registered service",
+        "description": (
+            f"Set the operational status of a service. "
+            f"Valid values: {', '.join(sorted(VALID_STATUSES))}. "
+            "Status is surfaced in list and resolve responses. "
+            "Callers (agents, monitors, or operators) can use this to signal "
+            "that a service is degraded or under maintenance."
+        ),
+        "arguments": [
+            {
+                "name": "service_id",
+                "type": "string",
+                "required": True,
+                "description": "Service identifier to update",
+            },
+            {
+                "name": "status",
+                "type": "string",
+                "required": True,
+                "description": "New status: live | degraded | maintenance",
+            },
+        ],
+        "examples": [
+            {
+                "description": "Mark a service as degraded",
+                "request": {
+                    "command": "setstatus",
+                    "args": {"service_id": "tmf622/ordermgt", "status": "degraded"},
+                },
+            },
+            {
+                "description": "Return a service to live",
+                "request": {
+                    "command": "setstatus",
+                    "args": {"service_id": "tmf622/ordermgt", "status": "live"},
+                },
+            },
+        ],
+    },
 }
 
 
@@ -586,6 +628,19 @@ async def cli_dispatch(request: Request):
                 400, "missing_required_argument", "service_id is required"
             )
         result = await asyncio.to_thread(cmd_unregister, service_id)
+
+    elif cmd == "setstatus":
+        service_id = args.get("service_id")
+        status = args.get("status")
+        if not service_id:
+            return _json_error(
+                400, "missing_required_argument", "service_id is required"
+            )
+        if not status:
+            return _json_error(
+                400, "missing_required_argument", "status is required"
+            )
+        result = await asyncio.to_thread(cmd_setstatus, service_id, status)
 
     else:
         return _json_error(

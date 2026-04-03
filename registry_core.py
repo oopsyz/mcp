@@ -119,6 +119,7 @@ def cmd_list(path: Path = REGISTRY_FILE) -> dict[str, Any]:
                 "id": s["id"],
                 "url": s.get("url", ""),
                 "handles": s.get("handles", ""),
+                "status": s.get("status", "live"),
             }
             for s in services
         ],
@@ -172,6 +173,7 @@ def cmd_resolve(
     matches = [
         {
             **svc,
+            "status": svc.get("status", "live"),
             "score": round(score, 2),
         }
         for svc, score in scored
@@ -206,6 +208,9 @@ def cmd_register(service: dict[str, Any], path: Path = REGISTRY_FILE) -> dict[st
 
     for i, existing in enumerate(services):
         if existing["id"] == service["id"]:
+            # Preserve operational status unless the caller explicitly sets it
+            if "status" not in service and "status" in existing:
+                service = {**service, "status": existing["status"]}
             services[i] = service
             write_registry(services, path)
             return {"status": "updated", "service": service}
@@ -226,6 +231,36 @@ def cmd_unregister(service_id: str, path: Path = REGISTRY_FILE) -> dict[str, Any
     return {"status": "unregistered", "service_id": service_id}
 
 
+VALID_STATUSES = {"live", "degraded", "maintenance"}
+
+
+def cmd_setstatus(
+    service_id: str, status: str, path: Path = REGISTRY_FILE
+) -> dict[str, Any]:
+    if status not in VALID_STATUSES:
+        return {
+            "error": f"Invalid status '{status}'. Must be one of: {', '.join(sorted(VALID_STATUSES))}"
+        }
+
+    services = parse_registry(path)
+    for svc in services:
+        if svc["id"] == service_id:
+            previous = svc.get("status", "live")
+            svc["status"] = status
+            write_registry(services, path)
+            return {
+                "status": "updated",
+                "service_id": service_id,
+                "previous": previous,
+                "current": status,
+            }
+
+    return {
+        "error": f"Service not found: {service_id}",
+        "available": [s["id"] for s in services],
+    }
+
+
 # ---------------------------------------------------------------------------
 # CLI entry point  —  python registry_core.py <command> [args...]
 # ---------------------------------------------------------------------------
@@ -239,6 +274,7 @@ Commands:
   resolve <query>               Semantic resolve — returns full registry for LLM
   register <json>               Register or update (pass service JSON object)
   unregister <service_id>       Remove a service by ID
+  setstatus <service_id> <status>  Update service status (live|degraded|maintenance)
 """
 
 
@@ -278,6 +314,11 @@ def cli_main(argv: list[str] | None = None) -> None:
             print("Error: service_id required", file=sys.stderr)
             sys.exit(1)
         result = cmd_unregister(args[1])
+    elif cmd == "setstatus":
+        if len(args) < 3:
+            print("Error: service_id and status required", file=sys.stderr)
+            sys.exit(1)
+        result = cmd_setstatus(args[1], args[2])
     else:
         print(f"Unknown command: {cmd}\n{USAGE}", file=sys.stderr)
         sys.exit(1)
