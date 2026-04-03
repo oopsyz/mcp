@@ -190,6 +190,8 @@ To remain compatible with this draft's earlier constraints, the namespace SHOULD
 ```text
 Agent
   ->
+Query registry (resolve namespace by intent)
+  ->
 Select namespace or service target
   ->
 Discover commands within that namespace
@@ -200,6 +202,8 @@ ODA component execution
 ```
 
 The selection step should be deterministic and inspectable. Implementations SHOULD be able to explain why a request was routed to a given namespace.
+
+The registry query step is optional when the agent already knows the target namespace. It is required when the agent must discover which namespace handles a given capability.
 
 ### 8.5 Hybrid Discovery Model
 
@@ -216,6 +220,8 @@ Federation can combine two complementary mechanisms.
 - vector search, intent matching, or other semantic narrowing
 - used before or within a constrained namespace
 - assists command selection without replacing explicit routing
+
+A conformant pattern for semantic narrowing is a **service registry**: a separately addressable CLI service that accepts natural language queries and returns ranked namespace endpoints. The registry holds `handles`, `use_when`, and `dependencies` metadata per service, and exposes the same CLI discovery contract as any other service (`GET /cli/registry`, `POST /cli/registry`). Agents query the registry before namespace selection; the registry does not replace namespace-level discovery.
 
 One practical interaction pattern is:
 
@@ -384,3 +390,21 @@ This approach aims to preserve:
 - strong governance
 - alignment with the ODA component model
 - agent-optimized interaction
+
+### 8.14 Registry Pattern
+
+A service registry is a conformant implementation of the hybrid discovery model described in 8.5.
+
+The registry is itself a CLI service. It satisfies the following federation concerns:
+
+**Routing flow (8.4):** The registry fills the namespace selection step. An agent with an intent but no known namespace queries the registry first, receives ranked namespace endpoints, then proceeds with standard command discovery.
+
+**Semantic narrowing (8.5.2):** The registry matches natural language queries against `handles` and `use_when` metadata per service. Matching MAY be LLM-powered (when a language model runtime is available) or keyword-scored (as a degraded fallback). The resolved response includes a `resolved_by` field so callers can distinguish the two.
+
+**Service ownership resolution (8.9):** The registry carries a `dependencies` field per service entry. When a service depends on another (e.g. an order service requires a catalog service to resolve a ProductOfferingRef), the resolver surfaces this as a `prerequisites` array in the resolve response. This satisfies the ownership resolution requirement without requiring the calling agent to know inter-service contracts in advance.
+
+**Operational status (8.9):** Each registry entry carries a `status` field (`live`, `degraded`, `maintenance`). Any agent or monitor that cannot reach a service MAY call `setstatus` on the registry to record the degraded state. The registry does not probe services itself — status is reported by observers.
+
+**Compatibility:** The registry does not replace namespace-level discovery. After resolving a namespace, the agent queries that service's own CLI endpoint for command discovery. The registry only answers "which service?" not "which command?".
+
+A registry entry links the governance layer (`domain-implementations.yml`, `implementation_id`) to the runtime layer (live CLI endpoint, operational status). Services register themselves on deployment; the registry does not require a separate provisioning step.

@@ -3,9 +3,14 @@
 This repo exposes the TMF620 command layer through two interfaces:
 
 - a compact HTTP CLI API for progressive discovery
-- a real MCP server with explicit tool schemas
+- an MCP server used here as a reference surface for benchmarking and testing
 
-The CLI API is the cheaper discovery path for agents that only need one command branch at a time. The MCP server is a proper tool surface with typed inputs, so it is better for standard MCP clients and stricter invocation contracts.
+It also includes an agent-facing service registry for federated discovery across
+multiple CLI services in the same style. This is not a conventional backend
+registry with a database or matching engine; it is designed to resolve natural-
+language requests when the client does not know the exact service name.
+
+The CLI API is the cheaper discovery path for agents that only need one command branch at a time. The MCP server is retained here as a comparison point for discovery payloads, tool-list size, and latency measurements.
 
 The practical reasons to keep both are:
 
@@ -13,7 +18,7 @@ The practical reasons to keep both are:
 - progressive help: agents can expand one command branch at a time with `help`
 - stronger MCP contracts: MCP tools now expose explicit schemas instead of a generic `args` object
 - simpler automation: `curl` works well for both humans and agents, especially when the command surface is already structured
-- one shared command layer: the same command definitions back the HTTP CLI API, the MCP server, and the benchmark
+- one shared command layer: the same command definitions back the HTTP CLI API, the MCP reference surface, and the benchmark
 
 The current token benchmark numbers are:
 
@@ -81,9 +86,23 @@ File: `tmf620_mcp_server.py`
 - FastAPI + the official MCP SDK (`FastMCP`)
 - exposes `/cli/tmf620/catalogmgt` as the primary HTTP CLI endpoint
 - keeps `/cli` and `/api/cli` as compatibility aliases
-- exposes explicit MCP tools for MCP-capable agents
+- exposes explicit MCP tools for benchmarking and test coverage
 - delegates HTTP CLI requests into `tmf620_commands.py`
 - delegates MCP tools into the shared command layer
+
+### 5. Registry Agent
+
+Files: `registry_core.py`, `registry_server.py`, `registry.md`
+
+- Markdown-backed, agent-facing registry for service discovery
+- exposes `/cli/registry` for list, get, resolve, register, unregister, and setstatus
+- uses `registry.md` as the single source of truth
+- supports semantic resolution from natural language service needs to service IDs
+- pairs with `.opencode/agents/agent/service-registry.md` for natural-language
+  lookup and routing when the target service is not known in advance
+
+Use the registry agent when you need to turn a natural-language intent into the
+right service first, then jump to that service's own CLI discovery surface.
 
 ## Docker
 
@@ -162,6 +181,23 @@ GET  http://localhost:7701/cli/tmf620/catalogmgt
 POST http://localhost:7701/cli/tmf620/catalogmgt
 ```
 
+### Start the registry server
+
+```bash
+uv run registry-server
+```
+
+Default registry URLs:
+
+```text
+http://localhost:7700
+http://localhost:7700/cli/registry
+```
+
+Registry data lives in `registry.md`. The registry agent is useful when a client
+only has a description like "manage product orders" and needs the correct service
+before calling that service's own CLI API.
+
 ## Configuration
 
 `config.json` is used by both the HTTP CLI API and MCP server:
@@ -184,6 +220,10 @@ Environment variables override file values at runtime:
 - `TMF620_API_URL`
 
 You can also override the config path with `TMF620_CONFIG_PATH`.
+
+The registry agent uses `registry.md` directly as its runtime source of truth,
+so updates from `register`, `unregister`, `setstatus`, or manual edits are all
+reflected immediately on the next request.
 
 ## HTTP CLI Commands
 
@@ -254,7 +294,16 @@ Available MCP tools:
 
 Tool count in this repo's MCP server: `38` total tools.
 
-The HTTP CLI API and MCP server share the same `config.json` and command layer, but they expose different discovery styles.
+The HTTP CLI API and MCP server share the same `config.json` and command layer, but the MCP server is mainly used here to benchmark discovery size, validate tool schemas, and compare latency against the CLI path.
+
+The registry server uses the same CLI-style discovery flow:
+
+- `list`
+- `get`
+- `resolve`
+- `register`
+- `unregister`
+- `setstatus`
 
 ## Agent Discovery
 
@@ -356,6 +405,10 @@ curl -X POST http://localhost:7701/cli/tmf620/catalogmgt -H "Content-Type: appli
 
 # MCP server
 curl http://localhost:7701/health
+
+# Registry server
+curl http://localhost:7700/health
+curl -X POST http://localhost:7700/cli/registry -H "Content-Type: application/json" -d '{"command":"list"}'
 ```
 
 ## Token Benchmark
@@ -425,5 +478,7 @@ Console scripts exposed by `pyproject.toml`:
 - `tmf620-mock-server`
 - `tmf620-mcp-server`
 - `tmf620-benchmark`
+- `registry-server`
+- `registry-cli`
 
 
