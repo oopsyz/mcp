@@ -8,7 +8,7 @@ The registry does not do semantic matching itself. It returns the full registry 
 
 ## Why a Markdown File
 
-The registry data lives in `registry.md`. Each H2 block is one service entry.
+The registry data lives in `registry_agent/data/registry.md`. Each H2 block is one service entry.
 
 - Human-readable and editable with any text editor
 - Git-trackable with meaningful diffs
@@ -21,10 +21,10 @@ The file is the single source of truth. The server reads it on every request and
 
 ## Architecture
 
-The registry has a shared core (`registry_core.py`) with two access paths:
+The registry has a shared core (`registry_agent/core.py`) with two access paths:
 
 ```text
-registry.md
+registry_agent/data/registry.md
     ├── OpenCode skill/agent  ← local, no server needed
     └── HTTP server (port 7700)  ← network access, LLM-powered resolve
                     ↓
@@ -33,23 +33,23 @@ registry.md
 
 ### Path 1: OpenCode Skill (Local)
 
-Runs `registry_core.py` directly — no server or LLM dependency. Use in `opencode serve`.
+Runs `registry_agent/core.py` directly — no server or LLM dependency. Use in `opencode serve`.
 
 ```sh
 # List services
-uv run python registry_core.py list
+uv run python registry_agent/core.py list
 
 # Get one service
-uv run python registry_core.py get tmf620/catalogmgt
+uv run python registry_agent/core.py get tmf620/catalogmgt
 
 # Semantic resolve (returns raw dump for agent to reason over)
-uv run python registry_core.py resolve I need to manage product orders
+uv run python registry_agent/core.py resolve I need to manage product orders
 
 # Register
-uv run python registry_core.py register '{"id":"...","url":"...","handles":"..."}'
+uv run python registry_agent/core.py register '{"id":"...","url":"...","handles":"..."}'
 
 # Unregister
-uv run python registry_core.py unregister tmf622/ordermgt
+uv run python registry_agent/core.py unregister tmf622/ordermgt
 ```
 
 ### Path 2: HTTP Server (Network, LLM-Powered)
@@ -88,7 +88,7 @@ curl -s -X POST http://localhost:7700/cli/registry \
 
 ## Registry Entry Format
 
-Each service in `registry.md` follows this structure:
+Each service in `registry_agent/data/registry.md` follows this structure:
 
 ```markdown
 ## <service-id>
@@ -288,7 +288,7 @@ Note: `include_raw` is ignored when opencode serve is available. The LLM path al
 
 ### register
 
-Add a new service or update an existing one. The service entry is written to `registry.md`.
+Add a new service or update an existing one. The service entry is written to `registry_agent/data/registry.md`.
 
 ```bash
 curl -s -X POST http://localhost:7700/cli/registry \
@@ -348,13 +348,13 @@ If opencode is unreachable at startup, the registry still starts — resolve wil
 
 ## OpenCode Chat Agent
 
-The registry also ships as an OpenCode agent at `.opencode/agents/agent/service-registry.md`. This is the **human chat interface** — it runs inside `opencode serve` and reads `registry.md` directly, with no dependency on the registry server.
+The registry also ships as an OpenCode agent at `.opencode/agents/agent/service-registry.md`. This is the **human chat interface** — it runs inside `opencode serve` and reads `registry_agent/data/registry.md` directly, with no dependency on the registry server.
 
 ### What it does
 
 The agent has access to `bash`, `read`, `write`, `grep`, `glob`, and `webfetch`. In a single conversation it can:
 
-1. **Read `registry.md`** to find services matching the user's intent
+1. **Read `registry_agent/data/registry.md`** to find services matching the user's intent
 2. **Explore a service** by curling its CLI API for the command catalog
 3. **Invoke commands** on the discovered service
 4. **Chain operations** across multiple services in one turn
@@ -364,7 +364,7 @@ The agent has access to `bash`, `read`, `write`, `grep`, `glob`, and `webfetch`.
 ```text
 User: "I need to work with product catalogs"
 
-Agent: reads registry.md, finds tmf620/catalogmgt
+Agent: reads registry_agent/data/registry.md, finds tmf620/catalogmgt
        → "Found the catalog service at localhost:7701. It handles
           product catalogs, specifications, offerings, and pricing."
 
@@ -388,7 +388,7 @@ Agent: curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
 | Human in chat | OpenCode agent/skill | Conversational discovery, ad-hoc queries, chaining |
 | CI/CD, scripts | Registry server HTTP | Automation, health checks, bulk operations, self-registration |
 
-Both read and write the same `registry.md` file.
+Both read and write the same `registry_agent/data/registry.md` file.
 
 ---
 
@@ -426,10 +426,10 @@ Services can register themselves on startup by calling the `register` command or
 
 1. Service starts and binds to its port
 2. Service calls `POST /cli/registry {"command":"register","args":{"body":{...}}}`
-3. Registry appends the entry to `registry.md`
+3. Registry appends the entry to `registry_agent/data/registry.md`
 4. Other agents can now discover this service via `resolve`
 
-For environments where services cannot self-register, add entries to `registry.md` by hand or through CI/CD.
+For environments where services cannot self-register, add entries to `registry_agent/data/registry.md` by hand or through CI/CD.
 
 ---
 
@@ -448,7 +448,7 @@ For environments where services cannot self-register, add entries to `registry.m
 
 | File | Role |
 |------|------|
-| `registry.md` | Service data — the single source of truth |
-| `registry_server.py` | FastAPI + MCP server (machine-to-machine) |
+| `registry_agent/data/registry.md` | Service data — the single source of truth |
+| `registry_agent/server.py` | FastAPI + MCP server (machine-to-machine) |
 | `.opencode/agents/agent/service-registry.md` | OpenCode chat agent (human interface) |
 | `opencode.json` | OpenCode MCP client configuration |

@@ -33,7 +33,7 @@ def raw_post(url, data_bytes):
         return e.code, e.read(), None
 
 
-print("=== SPEC.md CONFORMANCE TEST SUITE ===")
+print("=== docs/SPEC.md CONFORMANCE TEST SUITE ===")
 print()
 
 # 1. GET /cli/tmf620/catalogmgt - root catalog (Conformance #1)

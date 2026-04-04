@@ -15,6 +15,6 @@
   "features": {
     "enable_cors": true,
     "enable_docs": true,
-    "enable_mcp": true
+    "enable_mcp": false
   }
 }

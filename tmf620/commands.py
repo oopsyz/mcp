@@ -1,9 +1,9 @@
-﻿import argparse
+import argparse
 import json
 from pathlib import Path
 from typing import Any, Callable
 
-from tmf620_core import TMF620Client, TMF620Error
+from .core import TMF620Client, TMF620Error
 
 
 Handler = Callable[[argparse.Namespace], Any]
@@ -128,7 +128,7 @@ GLOBAL_OPTIONS: list[dict[str, Any]] = [
     {
         "flags": ["--config"],
         "help": (
-            "Path to config.json. If omitted, uses TMF620_CONFIG_PATH or ./config.json."
+            "Path to tmf620/config/config.json. If omitted, uses TMF620_CONFIG_PATH or ./tmf620/config/config.json."
         ),
     },
     {

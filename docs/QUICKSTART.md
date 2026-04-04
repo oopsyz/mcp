@@ -2,7 +2,7 @@
 
 ## Docker
 
-Use Docker if you want the mock API and MCP/HTTP CLI stack together in one containerized runtime.
+Use Docker if you want the TMF620 stack and registry service together in one containerized runtime.
 
 Once it is up, paste `http://localhost:7701/cli/tmf620/catalogmgt` into a Codex, Claude, or Cursor chat window and start talking to it.
 
@@ -15,10 +15,11 @@ The container exposes:
 - mock API at `http://localhost:8801/tmf-api/productCatalogManagement/v5`
 - MCP transport at `http://localhost:7701/mcp`
 - HTTP CLI API at `http://localhost:7701/cli/tmf620/catalogmgt`
+- registry server at `http://localhost:7700`
 
 The container uses environment overrides rather than rewriting config files. Set them in `docker-compose.yml`, or use a `.env` file with Docker Compose
 
-![Quick start](quick_start.png)
+![Quick start](assets/quick_start.png)
 
 ## Without Docker
 
@@ -52,7 +53,7 @@ The MCP server also exposes the HTTP CLI API pattern at `http://localhost:7701/c
 
 ### Use The HTTP CLI API
 
-The HTTP CLI API is the command interface for agents and scripts. With the default `config.json`, it talks to the mock server running on port `8801`.
+The HTTP CLI API is the command interface for agents and scripts. With the default `tmf620/config/config.json`, it talks to the mock server running on port `8801`.
 
 ```bash
 # Discover command surface as JSON
@@ -111,7 +112,7 @@ This is a separate adapter from the mock API. The HTTP CLI API and MCP tools bot
 
 ## Configuration
 
-Both the HTTP CLI API and MCP server read `config.json` by default, then apply `TMF620_API_URL` from Compose or the container environment:
+Both the HTTP CLI API and MCP server read `tmf620/config/config.json` by default, then apply `TMF620_API_URL` from Compose or the container environment:
 
 ```json
 {
@@ -132,7 +133,7 @@ You can override the config path with `TMF620_CONFIG_PATH`.
 
 - Use compact `GET /cli/tmf620/catalogmgt` for discovery, `GET /cli/tmf620/catalogmgt?verbose=true` only when you need the richer catalog, compact group help for branch selection, and detailed leaf help only when you are ready to invoke.
 - The MCP server is now a thin adapter over the same shared client logic.
-- The shared command registry lives in `tmf620_commands.py`.
+- The shared command registry lives in `tmf620/commands.py`.
 - The MCP adapter in this repo exposes 40 tools: 38 generated command routes plus 2 compatibility tools.
 - If the API is not running at the configured URL, both the HTTP CLI API and MCP server will fail.
 

@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import inspect
 import json
 import logging
 import textwrap
@@ -12,7 +13,7 @@ from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse, StreamingResponse
 from mcp.server.fastmcp import FastMCP
 
-from tmf620_commands import (
+from .commands import (
     COMMAND_TREE,
     CommandInvocationError,
     _command_identity,
@@ -21,7 +22,7 @@ from tmf620_commands import (
     get_command_help_payload,
     invoke_command,
 )
-from tmf620_core import TMF620Client, TMF620Error, load_config
+from .core import TMF620Client, TMF620Error, load_config
 
 
 logging.basicConfig(
@@ -94,7 +95,7 @@ def _tool_docstring(
 
 
 def _mcp_parameter_schema(arg_spec: dict[str, Any]) -> dict[str, Any] | None:
-    from tmf620_commands import _arg_dest, _arg_required
+    from .commands import _arg_dest, _arg_required
 
     dest = _arg_dest(arg_spec)
     if not dest:
@@ -105,26 +106,30 @@ def _mcp_parameter_schema(arg_spec: dict[str, Any]) -> dict[str, Any] | None:
         return {
             "name": dest,
             "annotation": "list[str] | None",
+            "python_type": list[str] | None,
             "required": False,
             "description": description,
         }
 
     py_type = arg_spec.get("type")
     annotation = "int" if py_type is int else "str"
+    python_type: Any = int if py_type is int else str
     required = _arg_required(arg_spec)
     if not required:
         annotation = f"{annotation} | None"
+        python_type = python_type | None
 
     return {
         "name": dest,
         "annotation": annotation,
+        "python_type": python_type,
         "required": required,
         "description": description,
     }
 
 
 def _mcp_tool_parameters(node: dict[str, Any]) -> list[dict[str, Any]]:
-    from tmf620_commands import _arg_dest
+    from .commands import _arg_dest
 
     required_parameters: list[dict[str, Any]] = []
     optional_parameters: list[dict[str, Any]] = []
@@ -138,6 +143,7 @@ def _mcp_tool_parameters(node: dict[str, Any]) -> list[dict[str, Any]]:
                     {
                         "name": "body",
                         "annotation": "dict[str, Any]",
+                        "python_type": dict[str, Any],
                         "required": True,
                         "description": "JSON request body as a Python object.",
                     }
@@ -155,52 +161,44 @@ def _mcp_tool_parameters(node: dict[str, Any]) -> list[dict[str, Any]]:
     return [*required_parameters, *optional_parameters]
 
 
-def _build_tool_function_source(
+def _build_mcp_tool_callable(
     *,
     function_name: str,
     command: str,
     summary: str,
     description: str,
     parameters: list[dict[str, Any]],
-) -> str:
+) -> Any:
     docstring = _tool_docstring(
         summary=summary, description=description, parameters=parameters
     )
-    signature_parts: list[str] = []
-    body_lines = ["args: dict[str, Any] = {}"]
-
-    for parameter in parameters:
-        param_line = (
-            f"{parameter['name']}: "
-            f"Annotated[{parameter['annotation']}, Field(description={parameter['description']!r})]"
+    parameter_signature = [
+        inspect.Parameter(
+            parameter["name"],
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            default=inspect._empty if parameter["required"] else None,
+            annotation=parameter["python_type"],
         )
-        if not parameter["required"]:
-            param_line += " = None"
-        signature_parts.append(param_line)
+        for parameter in parameters
+    ]
 
-        if parameter["name"] == "body":
-            body_lines.append('args["body"] = body')
-            continue
+    async def tool(**kwargs: Any) -> Any:
+        args: dict[str, Any] = {}
+        for parameter in parameters:
+            name = parameter["name"]
+            value = kwargs.get(name)
+            if value is None:
+                continue
+            args["body" if name == "body" else name] = value
+        return invoke_command(command, args, config_path=None, output="json")
 
-        body_lines.append(f"if {parameter['name']} is not None:")
-        body_lines.append(f'    args["{parameter["name"]}"] = {parameter["name"]}')
-
-    body_lines.append(
-        f"return invoke_command({command!r}, args, config_path=None, output='json')"
+    tool.__name__ = function_name
+    tool.__qualname__ = function_name
+    tool.__doc__ = docstring
+    tool.__signature__ = inspect.Signature(
+        parameters=parameter_signature, return_annotation=Any
     )
-
-    signature = ", ".join(signature_parts)
-    if signature:
-        signature = f"({signature})"
-    else:
-        signature = "()"
-
-    indented_body = textwrap.indent("\n".join(body_lines), "    ")
-    return (
-        f"def {function_name}{signature} -> Any:\n"
-        f"    {docstring!r}\n"
-        f"{indented_body}\n"
-    )
+    return tool
 
 
 def _register_mcp_tool(
@@ -212,17 +210,15 @@ def _register_mcp_tool(
     description: str,
     parameters: list[dict[str, Any]],
 ) -> None:
-    namespace: dict[str, Any] = {}
-    source = _build_tool_function_source(
+    tool_fn = _build_mcp_tool_callable(
         function_name=tool_name,
         command=command,
         summary=summary,
         description=description,
         parameters=parameters,
     )
-    exec(source, globals(), namespace)
     mcp_server.add_tool(
-        namespace[tool_name],
+        tool_fn,
         name=tool_name,
         description=_tool_docstring(
             summary=summary, description=description, parameters=parameters
@@ -644,7 +640,7 @@ mcp_server = FastMCP(
 )
 _register_mcp_tools(mcp_server)
 mcp_app = mcp_server.streamable_http_app()
-mcp_session_manager = mcp_server._session_manager
+mcp_session_manager = mcp_server.session_manager
 app.mount("/mcp", mcp_app)
 
 

@@ -10,6 +10,26 @@ multiple CLI services in the same style. This is not a conventional backend
 registry with a database or matching engine; it is designed to resolve natural-
 language requests when the client does not know the exact service name.
 
+Documentation index: [docs/README.md](docs/README.md)
+
+Repository layout:
+
+- `tmf620/` - TMF620 mock API, shared client, commands, server, and benchmark
+- `registry_agent/` - agent-facing registry core and HTTP CLI server
+- `tests/` - pytest-discoverable wrappers plus standalone conformance, API, registry, and edge-case scripts
+- `docs/` - long-form protocol docs and guides
+- `benchmarks/` - benchmark scripts and baseline data
+- `scripts/` - repo entrypoint scripts
+- `specs/` - source OpenAPI and protocol specs
+- `tmf620/config/` - TMF620 runtime configuration files
+- `registry_agent/data/` - canonical registry data
+- `DOMAIN.md` / `AGENTS.md` - repo-level contracts and agent instructions
+- `registry_agent/data/registry.md` / `tmf620/config/config.json` - canonical runtime data and configuration
+
+The TMF620 sample implementation and the registry service are kept in separate
+service-local folders so they can be deployed to different servers without
+sharing runtime assets.
+
 The CLI API is the cheaper discovery path for agents that only need one command branch at a time. The MCP server is retained here as a comparison point for discovery payloads, tool-list size, and latency measurements.
 
 The practical reasons to keep both are:
@@ -48,22 +68,22 @@ This keeps the operational logic in one place while supporting HTTP and MCP adap
 
 Request paths:
 
-- HTTP CLI API -> `tmf620_mcp_server.py` -> `tmf620_commands.py` -> `tmf620_core.py` -> TMF620 API
-- MCP client -> `tmf620_mcp_server.py` -> `tmf620_core.py` -> TMF620 API
+- HTTP CLI API -> `tmf620/server.py` -> `tmf620/commands.py` -> `tmf620/core.py` -> TMF620 API
+- MCP client -> `tmf620/server.py` -> `tmf620/core.py` -> TMF620 API
 
 ## Components
 
 ### 1. Mock TMF620 API
 
-File: `mock_tmf620_api_fastapi.py`
+File: `tmf620/mock_api.py`
 
 - FastAPI-based TMF620 mock server
 - sample catalogs, offerings, and specifications
-- Swagger docs and optional MCP exposure
+- Swagger docs
 
 ### 2. Shared TMF620 Client
 
-File: `tmf620_core.py`
+File: `tmf620/core.py`
 
 - config loading
 - HTTP request handling
@@ -73,7 +93,7 @@ File: `tmf620_core.py`
 
 ### 3. Shared Command Layer
 
-File: `tmf620_commands.py`
+File: `tmf620/commands.py`
 
 - canonical TMF620 command registry
 - machine-readable discover/help payloads
@@ -81,34 +101,34 @@ File: `tmf620_commands.py`
 
 ### 4. MCP + HTTP CLI Adapter
 
-File: `tmf620_mcp_server.py`
+File: `tmf620/server.py`
 
 - FastAPI + the official MCP SDK (`FastMCP`)
 - exposes `/cli/tmf620/catalogmgt` as the primary HTTP CLI endpoint
 - keeps `/cli` and `/api/cli` as compatibility aliases
 - exposes explicit MCP tools for benchmarking and test coverage
-- delegates HTTP CLI requests into `tmf620_commands.py`
+- delegates HTTP CLI requests into `tmf620/commands.py`
 - delegates MCP tools into the shared command layer
 
 ### 5. Registry Agent
 
-Files: `registry_core.py`, `registry_server.py`, `registry.md`
+Files: `registry_agent/core.py`, `registry_agent/server.py`, `registry_agent/data/registry.md`
 
 - Markdown-backed, agent-facing registry for service discovery
 - exposes `/cli/registry` for list, get, resolve, register, unregister, and setstatus
-- uses `registry.md` as the single source of truth
+- uses `registry_agent/data/registry.md` as the single source of truth
 - `resolve` is LLM-powered via opencode serve (falls back to keyword scoring if unavailable); set `OPENCODE_URL` to point at your opencode instance (default `http://127.0.0.1:4096`)
-- resolve response includes `prerequisites` — inter-service dependencies derived from the `Dependencies` field in `registry.md` — so agents know what other services to query before calling the matched service
+- resolve response includes `prerequisites` — inter-service dependencies derived from the `Dependencies` field in `registry_agent/data/registry.md` — so agents know what other services to query before calling the matched service
 - `setstatus` lets any caller (agent, monitor, operator) mark a service as `live`, `degraded`, or `maintenance`; status is surfaced in both `list` and `resolve`
 - pairs with `.opencode/agents/agent/service-registry.md` for natural-language lookup and routing when the target service is not known in advance
-- implements the registry pattern described in `SPEC_FEDERATION_EXTENSION.md` section 8.14
+- implements the registry pattern described in `docs/SPEC_FEDERATION_EXTENSION.md` section 8.14
 
 Use the registry agent when you need to turn a natural-language intent into the
 right service first, then jump to that service's own CLI discovery surface.
 
 ## Docker
 
-Use Docker if you want the mock API and MCP/HTTP CLI stack together in one containerized runtime.
+Use Docker if you want the TMF620 stack and registry service together in one containerized runtime.
 
 ```bash
 docker compose up --build
@@ -119,12 +139,13 @@ The container exposes:
 - mock API at `http://localhost:8801/tmf-api/productCatalogManagement/v5`
 - MCP transport at `http://localhost:7701/mcp`
 - HTTP CLI API at `http://localhost:7701/cli/tmf620/catalogmgt`
+- registry server at `http://localhost:7700`
 
 The container uses environment overrides rather than rewriting config files. Set them in `docker-compose.yml`, or use a `.env` file with Docker Compose:
 
 - `TMF620_API_URL`
 
-![Quick start](quick_start.png)
+![Quick start](docs/assets/quick_start.png)
 
 ## Without Docker
 
@@ -189,6 +210,12 @@ POST http://localhost:7701/cli/tmf620/catalogmgt
 uv run registry-server
 ```
 
+Or use the convenience script:
+
+```bash
+bash scripts/start-registry.sh
+```
+
 To enable LLM-powered resolve, point the registry at a running opencode instance:
 
 ```bash
@@ -202,14 +229,14 @@ http://localhost:7700
 http://localhost:7700/cli/registry
 ```
 
-Registry data lives in `registry.md`. The registry agent is useful when a client
+Registry data lives in `registry_agent/data/registry.md`. The registry agent is useful when a client
 only has a description like "manage product orders" and needs the correct service
 before calling that service's own CLI API. If opencode is not running, resolve
 falls back to keyword scoring automatically.
 
 ## Configuration
 
-`config.json` is used by both the HTTP CLI API and MCP server:
+`tmf620/config/config.json` is used by both the HTTP CLI API and MCP server:
 
 ```json
 {
@@ -230,7 +257,7 @@ Environment variables override file values at runtime:
 
 You can also override the config path with `TMF620_CONFIG_PATH`.
 
-The registry agent uses `registry.md` directly as its runtime source of truth,
+The registry agent uses `registry_agent/data/registry.md` directly as its runtime source of truth,
 so updates from `register`, `unregister`, `setstatus`, or manual edits are all
 reflected immediately on the next request.
 
@@ -299,11 +326,11 @@ Available MCP tools:
 - `tmf620_health`
 - `tmf620_config`
 - `tmf620_discover`
-- one explicit tool per leaf command in `tmf620_commands.py`
+- one explicit tool per leaf command in `tmf620/commands.py`
 
 Tool count in this repo's MCP server: `38` total tools.
 
-The HTTP CLI API and MCP server share the same `config.json` and command layer, but the MCP server is mainly used here to benchmark discovery size, validate tool schemas, and compare latency against the CLI path.
+The HTTP CLI API and MCP server share the same `tmf620/config/config.json` and command layer, but the MCP server is mainly used here to benchmark discovery size, validate tool schemas, and compare latency against the CLI path.
 
 The registry server uses the same CLI-style discovery flow:
 
@@ -331,7 +358,7 @@ Group-level help is also compact by default. Leaf-command help returns the detai
 
 ## HTTP CLI API
 
-The repo also exposes the CLI-style HTTP API pattern described in `CLI_API_PATTERN.md`.
+The repo also exposes the CLI-style HTTP API pattern described in `docs/CLI_API_PATTERN.md`.
 
 For agents, this is the canonical machine-facing command surface.
 
@@ -393,14 +420,14 @@ curl -N -X POST http://localhost:7701/cli/tmf620/catalogmgt \
 ## Python Usage
 
 ```python
-from tmf620_core import TMF620Client
+from tmf620.core import TMF620Client
 
 client = TMF620Client()
 catalogs = client.list_catalogs(limit=5)
 offerings = client.list_product_offerings(catalog_id="cat-001", limit=10)
 ```
 
-Import `TMF620Client` from `tmf620_core.py` directly for Python usage.
+Import `TMF620Client` from `tmf620.core` directly for Python usage.
 
 ## Testing
 
@@ -418,6 +445,13 @@ curl http://localhost:7701/health
 # Registry server
 curl http://localhost:7700/health
 curl -X POST http://localhost:7700/cli/registry -H "Content-Type: application/json" -d '{"command":"list"}'
+
+# Standalone scripts
+python tests/conformance_test.py
+python tests/test_cli_api.py
+python tests/test_registry.py
+python tests/edge_test.py
+pytest tests/test_suite.py
 ```
 
 ## Token Benchmark
@@ -439,7 +473,7 @@ Start the stack first:
 It measures:
 
 - compact `GET /cli/tmf620/catalogmgt` catalog
-- compact group help and leaf help from `tmf620_commands.py`
+- compact group help and leaf help from `tmf620/commands.py`
 - raw MCP tool objects from the live MCP server
 - OpenAI-style wrapped MCP tool payloads of the form `{"type":"function","function":{...}}`
 
@@ -489,5 +523,3 @@ Console scripts exposed by `pyproject.toml`:
 - `tmf620-benchmark`
 - `registry-server`
 - `registry-cli`
-
-

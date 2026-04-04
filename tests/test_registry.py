@@ -26,7 +26,7 @@ def test(name, fn):
 
 
 def core_list():
-    from registry_core import cmd_list
+    from registry_agent.core import cmd_list
 
     result = cmd_list()
     assert result["total"] >= 1
@@ -34,7 +34,7 @@ def core_list():
 
 
 def core_get():
-    from registry_core import cmd_get
+    from registry_agent.core import cmd_get
 
     result = cmd_get("tmf620/catalogmgt")
     assert "service" in result
@@ -42,14 +42,14 @@ def core_get():
 
 
 def core_get_not_found():
-    from registry_core import cmd_get
+    from registry_agent.core import cmd_get
 
     result = cmd_get("nonexistent")
     assert "error" in result
 
 
 def core_resolve():
-    from registry_core import cmd_resolve
+    from registry_agent.core import cmd_resolve
 
     result = cmd_resolve("I need to manage product catalogs")
     assert "query" in result
@@ -60,7 +60,12 @@ def core_resolve():
 
 
 def core_resolve_dependencies():
-    from registry_core import cmd_register, cmd_resolve, cmd_unregister, parse_registry
+    from registry_agent.core import (
+        cmd_register,
+        cmd_resolve,
+        cmd_unregister,
+        parse_registry,
+    )
 
     tmp = Path(tempfile.mkdtemp()) / "registry.md"
     tmp.write_text("# Service Registry\n\n")
@@ -98,7 +103,7 @@ def core_resolve_dependencies():
 
 
 def core_setstatus():
-    from registry_core import cmd_register, cmd_setstatus, cmd_get, cmd_list
+    from registry_agent.core import cmd_register, cmd_setstatus, cmd_get, cmd_list
 
     tmp = Path(tempfile.mkdtemp()) / "registry.md"
     tmp.write_text("# Service Registry\n\n")
@@ -139,7 +144,7 @@ def core_setstatus():
 
 
 def core_register_preserves_status():
-    from registry_core import cmd_register, cmd_setstatus, cmd_get
+    from registry_agent.core import cmd_register, cmd_setstatus, cmd_get
 
     tmp = Path(tempfile.mkdtemp()) / "registry.md"
     tmp.write_text("# Service Registry\n\n")
@@ -173,7 +178,7 @@ def core_register_preserves_status():
 
 
 def core_resolve_includes_status():
-    from registry_core import cmd_register, cmd_setstatus, cmd_resolve
+    from registry_agent.core import cmd_register, cmd_setstatus, cmd_resolve
 
     tmp = Path(tempfile.mkdtemp()) / "registry.md"
     tmp.write_text("# Service Registry\n\n")
@@ -206,7 +211,7 @@ def core_resolve_includes_status():
 
 
 def core_register_and_unregister():
-    from registry_core import cmd_register, cmd_unregister, cmd_list
+    from registry_agent.core import cmd_register, cmd_unregister, cmd_list
 
     tmp = Path(tempfile.mkdtemp()) / "registry.md"
     tmp.write_text("# Service Registry\n\n")
@@ -510,7 +515,7 @@ if __name__ == "__main__":
     print("=" * 60)
     print("Registry Test Suite")
     print("=" * 60)
-    print("\n-- registry_core.py (local) --")
+    print("\n-- registry_agent/core.py (local) --")
     test("core list", core_list)
     test("core get", core_get)
     test("core get not found", core_get_not_found)

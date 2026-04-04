@@ -2,9 +2,6 @@
 name = "tmf620-mcp-server"
 version = "1.0.0"
 description = "TMF620 Product Catalog Management MCP Server with Mock API"
-authors = [
-    {name = "Your Name", email = "your.email@example.com"}
-]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -25,30 +22,23 @@ dev = [
 ]
 
 [project.scripts]
-tmf620-mock-server = "mock_tmf620_api_fastapi:main"
-tmf620-mcp-server = "tmf620_mcp_server:main"
-tmf620-benchmark = "tmf620_benchmark:main"
-poc-linux-service = "poc_linux_service:main"
-registry-server = "registry_server:main"
-registry-cli = "registry_core:cli_main"
+tmf620-mock-server = "tmf620.mock_api:main"
+tmf620-mcp-server = "tmf620.server:main"
+tmf620-benchmark = "tmf620.benchmark:main"
+registry-server = "registry_agent.server:main"
+registry-cli = "registry_agent.core:cli_main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["."]
+packages = ["tmf620", "registry_agent"]
 include = [
-    "tmf620_core.py",
-    "tmf620_commands.py",
-    "tmf620_mcp_server.py",
-    "tmf620_benchmark.py",
-    "mock_tmf620_api_fastapi.py",
-    "config.json",
-    "mock_server_config.json",
-    "registry_core.py",
-    "registry_server.py",
-    "registry.md"
+    "tmf620/*.py",
+    "registry_agent/*.py",
+    "tmf620/config/*.json",
+    "registry_agent/data/registry.md"
 ]
 
 [tool.ruff]

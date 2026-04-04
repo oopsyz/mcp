@@ -16,7 +16,7 @@ import tiktoken
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-from tmf620_commands import _tool_name, get_catalog_payload, get_command_help_payload
+from .commands import _tool_name, get_catalog_payload, get_command_help_payload
 
 
 BASE = os.environ.get("TMF620_BASE_URL", "http://localhost:7701").rstrip("/")

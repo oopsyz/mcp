@@ -27,7 +27,7 @@ RUN uv sync --frozen --no-install-project
 COPY . .
 
 # Ensure the start script has LF line endings and is executable
-RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
+RUN sed -i 's/\r$//' scripts/start.sh && chmod +x scripts/start.sh
 
 # Install the project
 RUN uv sync --frozen
@@ -36,4 +36,4 @@ RUN uv sync --frozen
 EXPOSE 7701 8801
 
 # Run the start script
-CMD ["/app/start.sh"]
+CMD ["/app/scripts/start.sh"]

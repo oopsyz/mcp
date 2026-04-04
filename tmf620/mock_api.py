@@ -5,12 +5,14 @@ from datetime import datetime, timedelta
 from typing import Any, List, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Response, status
-from fastapi_mcp import FastApiMCP
 from pydantic import BaseModel, ConfigDict, Field
 
 
 def load_mock_config() -> dict[str, Any]:
-    config_path = os.path.join(os.path.dirname(__file__), "mock_server_config.json")
+    package_root = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(
+        package_root, "config", "mock_server_config.json"
+    )
     with open(config_path, encoding="utf-8") as f:
         config = json.load(f)
 
@@ -24,7 +26,6 @@ app = FastAPI(
     description=mock_config["server"]["description"],
     version=mock_config["server"]["version"],
 )
-mcp = FastApiMCP(app)
 
 BASE_PATH = "/tmf-api/productCatalogManagement/v5"
 
@@ -1156,19 +1157,11 @@ def main():
     """Main entry point for the mock TMF620 API server."""
     import uvicorn
 
-    if mock_config["features"]["enable_mcp"]:
-        mcp.mount()
-
     server_config = mock_config["server"]
     print(
         f"Starting {server_config['name']} on "
         f"{server_config['protocol']}://{server_config['host']}:{server_config['port']}"
     )
-    if mock_config["features"]["enable_mcp"]:
-        print(
-            f"MCP server available at "
-            f"{server_config['protocol']}://{server_config['host']}:{server_config['port']}/mcp"
-        )
     if mock_config["features"]["enable_docs"]:
         print(
             f"API Documentation available at "

@@ -1,10 +1,10 @@
 """
-Core registry operations on ``registry.md``.
+Core registry operations on ``registry_agent/data/registry.md``.
 
 This module has no web framework dependencies.  It is imported by both:
 
-- ``registry_server.py``  (FastAPI + MCP — network path)
-- OpenCode skill           (``python registry_core.py <cmd>`` — local path)
+- ``registry_agent/server.py``  (FastAPI + MCP — network path)
+- OpenCode skill              (``python registry_agent/core.py <cmd>`` — local path)
 """
 
 import json
@@ -18,7 +18,7 @@ from typing import Any
 # Defaults
 # ---------------------------------------------------------------------------
 
-REGISTRY_FILE = Path(__file__).parent / "registry.md"
+REGISTRY_FILE = Path(__file__).resolve().parent / "data" / "registry.md"
 
 _FIELD_DISPLAY = {
     "url": "URL",
@@ -43,8 +43,17 @@ def _normalize_key(raw: str) -> str:
     return raw.strip().lower().replace(" ", "_")
 
 
+def _validate_service_entry(service: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    cli = service.get("cli")
+    if cli is not None:
+        if not isinstance(cli, str) or not cli.startswith("/cli/"):
+            errors.append("CLI must be a string starting with '/cli/'.")
+    return errors
+
+
 def parse_registry(path: Path = REGISTRY_FILE) -> list[dict[str, Any]]:
-    """Parse *registry.md* into a list of service dicts."""
+    """Parse *registry_agent/data/registry.md* into a list of service dicts."""
     if not path.exists():
         return []
 
@@ -204,6 +213,10 @@ def cmd_register(service: dict[str, Any], path: Path = REGISTRY_FILE) -> dict[st
     if "id" not in service:
         return {"error": "Service entry must include an 'id' field."}
 
+    validation_errors = _validate_service_entry(service)
+    if validation_errors:
+        return {"error": "; ".join(validation_errors)}
+
     services = parse_registry(path)
 
     for i, existing in enumerate(services):
@@ -262,11 +275,11 @@ def cmd_setstatus(
 
 
 # ---------------------------------------------------------------------------
-# CLI entry point  —  python registry_core.py <command> [args...]
+# CLI entry point  —  python registry_agent/core.py <command> [args...]
 # ---------------------------------------------------------------------------
 
 USAGE = """\
-Usage: python registry_core.py <command> [args...]
+Usage: python registry_agent/core.py <command> [args...]
 
 Commands:
   list                          List all registered services

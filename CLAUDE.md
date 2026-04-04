@@ -24,11 +24,11 @@ Preferred shell pattern:
 
 ## Source of Truth
 
-The shared command layer lives in `tmf620_commands.py`.
+The shared command layer lives in `tmf620/commands.py`.
 
-- `tmf620_mcp_server.py` exposes the HTTP CLI API and MCP server
+- `tmf620/server.py` exposes the HTTP CLI API and MCP server
 
-When changing command names, arguments, discovery output, or invocation behavior, update `tmf620_commands.py` first.
+When changing command names, arguments, discovery output, or invocation behavior, update `tmf620/commands.py` first.
 
 ## Local URLs
 
@@ -43,5 +43,4 @@ When validating command behavior, prefer this order:
 1. `GET /cli/tmf620/catalogmgt`
 2. `POST /cli/tmf620/catalogmgt` with `help`
 3. `POST /cli/tmf620/catalogmgt` invoke
-
 

@@ -53,6 +53,16 @@ RESOURCE_ENDPOINT_ALIASES = {
 logger = logging.getLogger("tmf620")
 
 
+def _coerce_int_env(value: str, fallback: int, *, env_name: str) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Invalid %s value %r, falling back to %s", env_name, value, fallback
+        )
+        return fallback
+
+
 class TMF620Error(Exception):
     """Raised when the TMF620 API returns an error or cannot be reached."""
 
@@ -60,8 +70,8 @@ class TMF620Error(Exception):
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     """Load configuration from file, then fill gaps from environment variables."""
     config: Dict[str, Any] = {}
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    default_config_path = os.path.join(script_dir, "config.json")
+    package_root = os.path.dirname(os.path.abspath(__file__))
+    default_config_path = os.path.join(package_root, "config", "config.json")
     resolved_config_path = (
         config_path or os.environ.get("TMF620_CONFIG_PATH") or default_config_path
     )
@@ -85,11 +95,13 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
         "MCP_HOST",
         mcp_server.get("host") or DEFAULT_MCP_HOST,
     )
-    mcp_server["port"] = int(
+    mcp_server["port"] = _coerce_int_env(
         os.environ.get(
             "MCP_PORT",
             str(mcp_server.get("port") or DEFAULT_MCP_PORT),
-        )
+        ),
+        DEFAULT_MCP_PORT,
+        env_name="MCP_PORT",
     )
     mcp_server["name"] = os.environ.get(
         "MCP_NAME",
@@ -225,10 +237,10 @@ class TMF620Client:
             raise TMF620Error(
                 f"TMF620 API request timed out after {timeout or self.timeout} seconds"
             ) from exc
+        except requests.exceptions.JSONDecodeError as exc:
+            raise TMF620Error("Invalid JSON response from TMF620 API") from exc
         except requests.exceptions.RequestException as exc:
             raise TMF620Error(f"Error making request to TMF620 API: {exc}") from exc
-        except json.JSONDecodeError as exc:
-            raise TMF620Error("Invalid JSON response from TMF620 API") from exc
 
     def health(self) -> Dict[str, Any]:
         """Return a health payload that reflects API reachability."""

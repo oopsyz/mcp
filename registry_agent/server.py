@@ -1,7 +1,7 @@
 """
 CLI Service Registry — HTTP network interface.
 
-Core logic lives in ``registry_core.py``.  This module adds:
+Core logic lives in ``registry_agent/core.py``.  This module adds:
 - FastAPI HTTP CLI API (``/cli/registry``)
 - Health endpoint
 - LLM-powered resolve via opencode serve (falls back to raw dump)
@@ -19,9 +19,10 @@ import requests
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from starlette.responses import JSONResponse
 
-from registry_core import (
+from .core import (
     REGISTRY_FILE,
     VALID_STATUSES,
     cmd_get,
@@ -54,7 +55,7 @@ logger = logging.getLogger("registry")
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_HOST = "localhost"
+DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 7700
 
 CLI_NAMESPACE = "registry"
@@ -483,12 +484,16 @@ def _init_registry():
     logger.info("Registry loaded: %d service(s) from %s", count, REGISTRY_FILE)
 
 
-_init_registry()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _init_registry()
+    yield
 
 app = FastAPI(
     title="CLI Service Registry",
     description="Agent-facing service registry with semantic discovery",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -676,7 +681,7 @@ def main():
     print(f"HTTP CLI API:  http://{host}:{port}{CLI_ROUTE}")
     print(f"opencode URL:  {OPENCODE_URL} (for LLM-powered resolve)")
 
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
