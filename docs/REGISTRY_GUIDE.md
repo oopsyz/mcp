@@ -26,6 +26,7 @@ The registry has a shared core (`registry_agent/core.py`) with two access paths:
 ```text
 registry_agent/data/registry.md
     ├── OpenCode skill/agent  ← local, no server needed
+    ├── OpenCode sidecar (port 4096) ← semantic matching runtime
     └── HTTP server (port 7700)  ← network access, LLM-powered resolve
                     ↓
               opencode serve (port 4096)  ← for semantic matching
@@ -33,7 +34,7 @@ registry_agent/data/registry.md
 
 ### Path 1: OpenCode Skill (Local)
 
-Runs `registry_agent/core.py` directly — no server or LLM dependency. Use in `opencode serve`.
+Runs `registry_agent/core.py` directly — no server dependency. Use in `opencode serve`.
 
 ```sh
 # List services
@@ -81,7 +82,8 @@ curl -s -X POST http://localhost:7700/cli/registry \
 
 **For LLM-powered resolve to work:**
 
-- opencode serve must be running on port 4096 (or set `OPENCODE_URL` env var)
+- `docker-compose.registry.yml` starts an `opencode` sidecar on port 4096
+- set `OPENCODE_URL` only if you want to target an external opencode instance
 - If opencode is unavailable, resolve falls back to returning the raw dump
 
 ---
@@ -162,7 +164,7 @@ curl -s -X POST http://localhost:7700/cli/registry \
   -d '{"command":"resolve","args":{"query":"I need to manage product orders"}}'
 ```
 
-**Success response** (opencode serve running, matches found):
+**Success response** (OpenCode available, matches found):
 
 ```json
 {
@@ -198,7 +200,7 @@ curl -s -X POST http://localhost:7700/cli/registry \
 }
 ```
 
-**No matches response** (opencode found nothing, stays light):
+**No matches response** (OpenCode found nothing, stays light):
 
 ```json
 {
@@ -215,7 +217,7 @@ curl -s -X POST http://localhost:7700/cli/registry \
 
 Note: The `note` field provides guidance when no matches are found. The response is kept **light and efficient**—never includes the full registry when using the LLM path, even if `include_raw=true`.
 
-**Fallback response** (opencode serve unavailable):
+**Fallback response** (OpenCode unavailable):
 
 The fallback is a degraded, temporary mode — keyword scoring only, no LLM reasoning. Check `resolved_by` before relying on `prerequisites`:
 
@@ -284,7 +286,7 @@ Note: `include_raw` is ignored when opencode serve is available. The LLM path al
 3. Registry parses the LLM response and extracts the matches
 4. Returns structured matches to the client
 
-**Graceful degradation:** If opencode serve is unreachable, the registry falls back to Option A behavior (returns raw dump). This ensures resolve always returns *something* useful.
+**Graceful degradation:** If OpenCode is unreachable, the registry falls back to Option A behavior (returns raw dump). This ensures resolve always returns *something* useful.
 
 ### register
 
@@ -332,6 +334,7 @@ curl -s -X POST http://localhost:7700/cli/registry \
 
 - `OPENCODE_URL` — URL to opencode serve for LLM-powered resolve
   - Default: `http://127.0.0.1:4096`
+  - In compose: `http://opencode:4096`
   - Example: `OPENCODE_URL=http://opencode.internal:4096 uv run registry-server`
 
 ### Startup Behavior
@@ -342,7 +345,7 @@ When `registry-server` starts, it logs:
 - HTTP CLI API endpoint
 - opencode URL (for LLM-powered resolve)
 
-If opencode is unreachable at startup, the registry still starts — resolve will just use the fallback (raw dump).
+If OpenCode is unreachable at startup, the registry still starts — resolve will just use the fallback (raw dump).
 
 ---
 

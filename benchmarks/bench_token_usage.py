@@ -214,11 +214,16 @@ def main():
 
     print(f"  {'-' * 80}")
     print(
-        f"  {'TOTAL (payload)':<25s} | {'':>6s} {'':>7s} | {'':>6s} {'':>7s} | {total_cli_payload - total_mcp_payload:>9}"
+        f"  {'PAYLOAD TOTAL (sampled)':<25s} | {'':>6s} {'':>7s} | {'':>6s} {'':>7s} | {total_cli_payload - total_mcp_payload:>9}"
     )
 
+    op_count = len(results)
+    avg_cli_payload = total_cli_payload / op_count
+    avg_mcp_payload = total_mcp_payload / op_count
+
     print(f"\n{'=' * 95}")
-    print("Full session cost = tool_defs * N_turns + payload_per_turn * N_turns")
+    print("Session cost model = tool_defs * N_turns + average sampled operation payload * N_turns")
+    print("Assumption: each turn is represented by one sampled operation.")
     print(f"{'=' * 95}")
 
     print(
@@ -227,8 +232,8 @@ def main():
     print(f"  {'-' * 55}")
 
     for n in [1, 5, 10, 20, 50]:
-        cli_cost = CLI_TOOL_TOKENS * n + total_cli_payload * n
-        mcp_cost = MCP_TOOL_TOKENS * n + total_mcp_payload * n
+        cli_cost = CLI_TOOL_TOKENS * n + avg_cli_payload * n
+        mcp_cost = MCP_TOOL_TOKENS * n + avg_mcp_payload * n
         saved = mcp_cost - cli_cost
         pct = (saved / mcp_cost) * 100
         print(
@@ -244,9 +249,7 @@ def main():
     print(
         f"  MCP tool overhead:  ~{MCP_TOOL_TOKENS:,} tokens/turn  ({len(mcp_tool_defs_json)} separate tools)"
     )
-    print(
-        f"  CLI envelope cost:  ~{total_cli_payload - total_mcp_payload} tokens/call more on payload"
-    )
+    print(f"  Avg CLI envelope cost:  ~{avg_cli_payload - avg_mcp_payload:.0f} tokens/call more on payload")
     print(
         f"  CLI net savings:    ~{MCP_TOOL_TOKENS - CLI_TOOL_TOKENS:,} tokens/turn (tool def savings >> envelope cost)"
     )

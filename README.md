@@ -117,7 +117,7 @@ Files: `registry_agent/core.py`, `registry_agent/server.py`, `registry_agent/dat
 - Markdown-backed, agent-facing registry for service discovery
 - exposes `/cli/registry` for list, get, resolve, register, unregister, and setstatus
 - uses `registry_agent/data/registry.md` as the single source of truth
-- `resolve` is LLM-powered via opencode serve (falls back to keyword scoring if unavailable); set `OPENCODE_URL` to point at your opencode instance (default `http://127.0.0.1:4096`)
+- `resolve` is LLM-powered via opencode serve (falls back to keyword scoring if unavailable); `docker-compose.registry.yml` starts an `opencode` sidecar by default, and `OPENCODE_URL` only needs changing if you use an external opencode instance
 - resolve response includes `prerequisites` — inter-service dependencies derived from the `Dependencies` field in `registry_agent/data/registry.md` — so agents know what other services to query before calling the matched service
 - `setstatus` lets any caller (agent, monitor, operator) mark a service as `live`, `degraded`, or `maintenance`; status is surfaced in both `list` and `resolve`
 - pairs with `.opencode/agents/agent/service-registry.md` for natural-language lookup and routing when the target service is not known in advance
@@ -128,22 +128,28 @@ right service first, then jump to that service's own CLI discovery surface.
 
 ## Docker
 
-Use Docker if you want the TMF620 stack and registry service together in one containerized runtime.
+Use the TMF620 compose file for the mock API + MCP server, and a separate compose file for the registry service.
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.yml up --build
+# registry only
+docker compose -f docker-compose.registry.yml up --build
 ```
 
-The container exposes:
+TMF620 stack exposes:
 
 - mock API at `http://localhost:8801/tmf-api/productCatalogManagement/v5`
 - MCP transport at `http://localhost:7701/mcp`
 - HTTP CLI API at `http://localhost:7701/cli/tmf620/catalogmgt`
+
+Registry service exposes:
+
 - registry server at `http://localhost:7700`
 
-The container uses environment overrides rather than rewriting config files. Set them in `docker-compose.yml`, or use a `.env` file with Docker Compose:
+The containers use environment overrides rather than rewriting config files. Set them in the matching compose file, or use a `.env` file with Docker Compose:
 
 - `TMF620_API_URL`
+- `OPENCODE_URL` for the registry, only if you want to point at an external opencode instance instead of the compose sidecar
 
 ![Quick start](docs/assets/quick_start.png)
 
@@ -216,11 +222,15 @@ Or use the convenience script:
 bash scripts/start-registry.sh
 ```
 
-To enable LLM-powered resolve, point the registry at a running opencode instance:
+To enable LLM-powered resolve outside compose, point the registry at a running opencode instance:
 
 ```bash
 OPENCODE_URL=http://127.0.0.1:4096 uv run registry-server
 ```
+
+When using `docker-compose.registry.yml`, the compose stack starts an `opencode`
+sidecar on port `4096` and sets `OPENCODE_URL=http://opencode:4096` for the
+registry container automatically.
 
 Default registry URLs:
 
@@ -464,6 +474,7 @@ The token benchmark fetches the MCP tool list from the running server, so the st
 Start the stack first:
 
 - `docker compose up --build`
+- `docker compose -f docker-compose.registry.yml up --build`
 - or `uv run tmf620-mcp-server`
 
 It measures:

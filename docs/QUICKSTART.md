@@ -2,22 +2,27 @@
 
 ## Docker
 
-Use Docker if you want the TMF620 stack and registry service together in one containerized runtime.
+Use the TMF620 compose file for the mock API + MCP server, and a separate compose file for the registry service.
 
 Once it is up, paste `http://localhost:7701/cli/tmf620/catalogmgt` into a Codex, Claude, or Cursor chat window and start talking to it.
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.yml up --build
+# registry only
+docker compose -f docker-compose.registry.yml up --build
 ```
 
-The container exposes:
+TMF620 stack exposes:
 
 - mock API at `http://localhost:8801/tmf-api/productCatalogManagement/v5`
 - MCP transport at `http://localhost:7701/mcp`
 - HTTP CLI API at `http://localhost:7701/cli/tmf620/catalogmgt`
+
+Registry service exposes:
+
 - registry server at `http://localhost:7700`
 
-The container uses environment overrides rather than rewriting config files. Set them in `docker-compose.yml`, or use a `.env` file with Docker Compose
+The containers use environment overrides rather than rewriting config files. Set them in the matching compose file, or use a `.env` file with Docker Compose
 
 ![Quick start](assets/quick_start.png)
 

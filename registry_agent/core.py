@@ -165,7 +165,8 @@ def cmd_list(path: Path = REGISTRY_FILE) -> dict[str, Any]:
 def cmd_get(service_id: str, path: Path = REGISTRY_FILE) -> dict[str, Any]:
     for s in parse_registry(path):
         if s["id"] == service_id:
-            return {"service": s}
+            service = {**s, "status": s.get("status", "live")}
+            return {"service": service}
     return {
         "error": f"Service not found: {service_id}",
         "available": [s["id"] for s in parse_registry(path)],

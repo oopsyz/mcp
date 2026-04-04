@@ -1,0 +1,29 @@
+services:
+  opencode:
+    build:
+      context: .
+      dockerfile: Dockerfile.opencode
+    ports:
+      - "4096:4096"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s = socket.create_connection(('127.0.0.1', 4096), 2); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  registry:
+    build: .
+    command: ["uv", "run", "registry-server"]
+    depends_on:
+      opencode:
+        condition: service_healthy
+    environment:
+      OPENCODE_URL: http://opencode:4096
+    ports:
+      - "7700:7700"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
