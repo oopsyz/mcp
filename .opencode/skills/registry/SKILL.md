@@ -13,91 +13,68 @@ version: "1.0.0"
 
 Manages and queries the CLI service registry stored in `registry_agent/data/registry.md`.
 
-All operations run through `registry_agent/core.py`. Use
-`uv run python registry_agent/core.py <command> [args...]` to invoke.
+Use `registry_agent/data/registry.md` as the source of truth for service discovery. Read the registry directly and reason over `handles`, `use_when`, `tags`, `dependencies`, and `status`.
 
-## Commands
-
-### List all services
+Use `registry_agent/core.py` only for deterministic maintenance operations:
 
 ```bash
-uv run python registry_agent/core.py list
+python3 registry_agent/core.py list
+python3 registry_agent/core.py get <service_id>
+python3 registry_agent/core.py register '<json>'
+python3 registry_agent/core.py unregister <service_id>
+python3 registry_agent/core.py setstatus <service_id> <status>
 ```
 
-Returns JSON with all services (id, url, handles).
+Do not use `python3 registry_agent/core.py resolve ...` as the primary reasoning path. That command is only a deterministic fallback when OpenCode-backed semantic resolve is unavailable.
 
-### Get one service by ID
+## Resolve Workflow
 
-```bash
-uv run python registry_agent/core.py get <service_id>
-```
+For vague user intent, read `registry_agent/data/registry.md` directly:
 
-Example:
+1. infer the likely capability from the user's language
+2. match against `handles`, `use_when`, `tags`, and dependency context
+3. rank the best service candidates
+4. if the user is asking for an action, then explore and invoke the matched service CLI
 
-```bash
-uv run python registry_agent/core.py get tmf620/catalogmgt
-```
+## CLI API Contract
 
-### Resolve — semantic service discovery
+Every registered service follows the same HTTP CLI API pattern. Use `bash` with `curl` to interact:
 
-```bash
-uv run python registry_agent/core.py resolve <natural language query>
-```
-
-Returns the full registry content plus structured service data so you can
-reason over the `handles` and `use_when` fields to pick the best match.
-
-Example:
-
-```bash
-uv run python registry_agent/core.py resolve I need to manage product orders
-```
-
-After resolving, explore the matched service's command catalog:
+### Discover commands
 
 ```bash
 curl -s <URL><CLI>
 ```
 
-Then invoke commands on it:
+### Get help for a command
 
 ```bash
 curl -s -X POST <URL><CLI> \
   -H "Content-Type: application/json" \
-  -d '{"command":"<cmd>","args":{...}}'
+  -d '{"command":"help","args":{"command":"<command path>"}}'
 ```
 
-### Register a new service
+### Invoke a command
 
 ```bash
-uv run python registry_agent/core.py register '<json>'
-```
-
-Example:
-
-```bash
-uv run python registry_agent/core.py register '{"id":"tmf622/ordermgt","url":"http://localhost:7702","cli":"/cli/tmf622/ordermgt","mcp":"http://localhost:7702/mcp","handles":"product orders, order lifecycle","use_when":"agent needs to place, track, or cancel orders","owner":"order-team","tags":["order","fulfillment","tmf622"]}'
-```
-
-### Unregister a service
-
-```bash
-uv run python registry_agent/core.py unregister <service_id>
+curl -s -X POST <URL><CLI> \
+  -H "Content-Type: application/json" \
+  -d '{"command":"<command path>","args":{...}}'
 ```
 
 ## Chaining: Resolve then Invoke
 
 The typical workflow for a user request like "show me the active catalogs":
 
-1. Resolve: `uv run python registry_agent/core.py resolve product catalogs`
-2. Read the result, pick the best service (match on `handles` / `use_when`)
+1. Read `registry_agent/data/registry.md`
+2. Pick the best matching service for product catalogs
 3. Explore: `curl -s <url><cli>`
 4. Invoke: `curl -s -X POST <url><cli> -H "Content-Type: application/json" -d '{"command":"catalog list","args":{"lifecycle_status":"Active"}}'`
 
 ## Guidelines
 
-- Always run resolve or list first before making assumptions about available services
-- Match user intent against `handles` and `use_when` fields
+- Always resolve or list first before making assumptions about available services
+- Match user intent against `handles`, `use_when`, `tags`, and dependency context
 - When multiple services match, present options and let the user choose
 - For write operations (register, unregister), confirm with the user first
 - After resolving a service, explore its CLI API to find the right command

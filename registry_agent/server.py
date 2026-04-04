@@ -1,10 +1,10 @@
 """
-CLI Service Registry — HTTP network interface.
+CLI Service Registry - HTTP network interface.
 
-Core logic lives in ``registry_agent/core.py``.  This module adds:
+Core logic lives in ``registry_agent/core.py``. This module adds:
 - FastAPI HTTP CLI API (``/cli/registry``)
 - Health endpoint
-- LLM-powered resolve via opencode serve (falls back to raw dump)
+- OpenCode-backed resolve that reuses the registry chat agent
 """
 
 import asyncio
@@ -13,13 +13,13 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Any
 
+from contextlib import asynccontextmanager
 import requests
-
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 from starlette.responses import JSONResponse
 
 from .core import (
@@ -62,23 +62,15 @@ CLI_NAMESPACE = "registry"
 CLI_ROUTE = f"/cli/{CLI_NAMESPACE}"
 
 OPENCODE_URL = os.environ.get("OPENCODE_URL", "http://127.0.0.1:4096")
+OPENCODE_AGENT = os.environ.get("OPENCODE_AGENT", "service-registry")
+OPENCODE_TIMEOUT_SECONDS = float(os.environ.get("OPENCODE_TIMEOUT_SECONDS", "30"))
 
-RESOLVE_SYSTEM_PROMPT = """\
-You are a service registry resolver. Match the user's natural language query \
-to the most relevant registered service(s).
+PROGRAMMATIC_RESOLVE_PROMPT = """\
+PROGRAMMATIC RESOLVE REQUEST
 
-Return ONLY a valid JSON object — no markdown fences, no explanation, no other text:
+Query: {query}
 
-{"matches":[{"id":"service-id","url":"http://...","cli":"/cli/...","mcp":"http://.../mcp","confidence":0.95,"reason":"one sentence: why this service matches the query","prerequisites":[{"id":"dep-service-id","note":"one sentence: what you need from this dependency and why"}]}]}
-
-Rules:
-- confidence: float 0.0–1.0
-- Only include services with confidence > 0.5
-- Order by confidence descending
-- If nothing matches: {"matches":[]}
-- prerequisites: derive from the service's "dependencies" field. For each dependency, write one sentence explaining what the caller needs from it. If dependencies is "none" or empty, use [].
-- prerequisites notes must describe WHAT to get (e.g. "Requires a ProductOfferingRef"), not HOW to get it (no step-by-step sequences)
-- ONLY output the JSON object, nothing else"""
+Return only the JSON object required by the programmatic resolve contract."""
 
 
 def _now() -> str:
@@ -86,7 +78,7 @@ def _now() -> str:
 
 
 # ---------------------------------------------------------------------------
-# opencode serve integration — LLM-powered resolve
+# opencode serve integration - registry-agent-backed resolve
 # ---------------------------------------------------------------------------
 
 
@@ -107,6 +99,45 @@ def _extract_response_text(response_data: dict) -> str:
     if "text" in response_data:
         return response_data["text"]
     return ""
+
+
+def _message_role(message: Any) -> str:
+    if not isinstance(message, dict):
+        return ""
+    role = str(message.get("role", "")).strip().lower()
+    if role:
+        return role
+    info = message.get("info")
+    if isinstance(info, dict):
+        return str(info.get("role", "")).strip().lower()
+    return ""
+
+
+def _assistant_message_completed(message: Any) -> bool:
+    if not isinstance(message, dict):
+        return False
+    info = message.get("info")
+    if not isinstance(info, dict):
+        return False
+    time_info = info.get("time")
+    if isinstance(time_info, dict) and time_info.get("completed") is not None:
+        return True
+    finish = str(info.get("finish", "")).strip().lower()
+    return bool(finish)
+
+
+def _assistant_message_error(message: Any) -> str | None:
+    if not isinstance(message, dict):
+        return None
+    info = message.get("info")
+    if not isinstance(info, dict):
+        return None
+    error = info.get("error")
+    if not isinstance(error, dict):
+        return None
+    name = str(error.get("name") or "").strip()
+    message_text = str(error.get("message") or "").strip()
+    return ": ".join(part for part in (name, message_text) if part) or "unknown error"
 
 
 def _parse_json_from_text(text: str) -> dict | None:
@@ -131,16 +162,13 @@ def _parse_json_from_text(text: str) -> dict | None:
     return None
 
 
-def _resolve_via_opencode(
-    query: str, services: list[dict], opencode_url: str = OPENCODE_URL
-) -> dict | None:
-    """Call opencode serve for LLM-powered semantic matching.
+def _resolve_via_opencode(query: str, opencode_url: str = OPENCODE_URL) -> dict | None:
+    """Call the OpenCode registry agent for semantic matching.
 
-    Returns ``{"matches": [...]}`` on success, ``None`` on failure (caller
-    should fall back to the raw-dump resolve).
+    Returns ``{"matches": [...]}`` on success, ``None`` on failure so the
+    caller can fall back to deterministic keyword scoring.
     """
     try:
-        # 1. Create session
         resp = requests.post(
             f"{opencode_url}/session",
             json={"title": "registry-resolve"},
@@ -157,37 +185,66 @@ def _resolve_via_opencode(
             return None
 
         try:
-            # 2. Send resolve message
-            services_json = json.dumps(services, indent=2)
-            message = f"Query: {query}\n\nRegistered services:\n{services_json}"
-
+            prompt = PROGRAMMATIC_RESOLVE_PROMPT.format(query=query)
             resp = requests.post(
-                f"{opencode_url}/session/{session_id}/message",
+                f"{opencode_url}/session/{session_id}/prompt_async",
                 json={
-                    "system": RESOLVE_SYSTEM_PROMPT,
-                    "tools": [],
-                    "parts": [{"type": "text", "text": message}],
+                    "agent": OPENCODE_AGENT,
+                    "parts": [{"type": "text", "text": prompt}],
                 },
-                timeout=30,
+                timeout=5,
             )
             if resp.status_code != 200:
-                logger.warning("opencode message failed: %d", resp.status_code)
+                logger.warning("opencode prompt failed: %d", resp.status_code)
                 return None
 
-            # 3. Parse response
-            text = _extract_response_text(resp.json())
-            if not text:
-                logger.warning("opencode returned empty response")
-                return None
+            deadline = datetime.datetime.now() + datetime.timedelta(
+                seconds=OPENCODE_TIMEOUT_SECONDS
+            )
+            latest_text = ""
 
-            parsed = _parse_json_from_text(text)
-            if parsed and "matches" in parsed:
-                return parsed
+            while datetime.datetime.now() < deadline:
+                resp = requests.get(
+                    f"{opencode_url}/session/{session_id}/message",
+                    timeout=5,
+                )
+                if resp.status_code != 200:
+                    logger.warning("opencode messages poll failed: %d", resp.status_code)
+                    return None
 
-            logger.warning("opencode response not valid resolve JSON: %s", text[:200])
+                messages = resp.json()
+                if not isinstance(messages, list):
+                    logger.warning("opencode messages payload was not a list")
+                    return None
+
+                for message in messages:
+                    if _message_role(message) != "assistant":
+                        continue
+                    text = _extract_response_text(message)
+                    if text:
+                        latest_text = text
+                    error_text = _assistant_message_error(message)
+                    if error_text:
+                        logger.warning("opencode assistant error: %s", error_text)
+                        return None
+                    if _assistant_message_completed(message):
+                        parsed = _parse_json_from_text(text or latest_text)
+                        if parsed and "matches" in parsed:
+                            return parsed
+                        logger.warning(
+                            "opencode response not valid resolve JSON: %s",
+                            (text or latest_text)[:200],
+                        )
+                        return None
+
+                time_left = (deadline - datetime.datetime.now()).total_seconds()
+                if time_left <= 0:
+                    break
+                time.sleep(min(1.0, time_left))
+
+            logger.warning("opencode resolve timed out after %.1f seconds", OPENCODE_TIMEOUT_SECONDS)
             return None
         finally:
-            # 4. Clean up session
             try:
                 requests.delete(f"{opencode_url}/session/{session_id}", timeout=5)
             except Exception:
@@ -241,10 +298,10 @@ COMMANDS: dict[str, dict[str, Any]] = {
     "resolve": {
         "summary": "Semantic service resolution (LLM-powered with fallback)",
         "description": (
-            "Semantic matching for a natural-language query. Tries LLM-powered "
-            "matching via opencode serve first; falls back to lightweight keyword "
-            "scoring if opencode is unavailable. Set include_raw=true to also get "
-            "the full registry markdown."
+            "Semantic matching for a natural-language query. Delegates to the "
+            "OpenCode registry agent first and falls back to lightweight keyword "
+            "scoring if OpenCode is unavailable. Set include_raw=true to also get "
+            "the full registry markdown on fallback."
         ),
         "arguments": [
             {
@@ -276,7 +333,7 @@ COMMANDS: dict[str, dict[str, Any]] = {
         ],
         "examples": [
             {
-                "description": "Find a service for orders (LLM or keyword fallback)",
+                "description": "Find a service for orders (OpenCode agent or keyword fallback)",
                 "request": {
                     "command": "resolve",
                     "args": {"query": "I need to manage product orders"},
@@ -590,9 +647,8 @@ async def cli_dispatch(request: Request):
         limit = args.get("limit", 5)
         include_raw = args.get("include_raw", False)
 
-        # Try LLM-powered resolve via opencode serve
-        services = await asyncio.to_thread(parse_registry)
-        smart = await asyncio.to_thread(_resolve_via_opencode, query, services)
+        # Try semantic resolve via the OpenCode registry agent
+        smart = await asyncio.to_thread(_resolve_via_opencode, query)
 
         if smart is not None:
             # LLM succeeded (or returned empty, which is still success)
@@ -600,7 +656,7 @@ async def cli_dispatch(request: Request):
             result = {
                 "query": query,
                 "matches": matches,
-                "resolved_by": "opencode",
+                "resolved_by": "opencode-agent",
             }
             # If LLM found nothing, add guidance
             if not matches:
@@ -609,8 +665,9 @@ async def cli_dispatch(request: Request):
                     "or try a different query."
                 )
         else:
-            # Fallback: opencode unavailable, use keyword scoring.
-            # prerequisites is not present — dependency notes require LLM reasoning.
+            # Fallback: OpenCode unavailable, use keyword scoring.
+            # prerequisites is not present because dependency notes require
+            # semantic reasoning from the registry agent.
             result = await asyncio.to_thread(
                 cmd_resolve, query, limit=limit, include_raw=include_raw
             )
@@ -679,7 +736,8 @@ def main():
     print(f"Registry file: {REGISTRY_FILE}")
     print(f"Health check:  http://{host}:{port}/health")
     print(f"HTTP CLI API:  http://{host}:{port}{CLI_ROUTE}")
-    print(f"opencode URL:  {OPENCODE_URL} (for LLM-powered resolve)")
+    print(f"opencode URL:  {OPENCODE_URL} (for registry-agent resolve)")
+    print(f"opencode agent: {OPENCODE_AGENT}")
 
     uvicorn.run(app, host=host, port=port)
 

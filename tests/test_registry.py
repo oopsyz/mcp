@@ -255,7 +255,7 @@ def test_registry_http_resolve(registry_available):
     assert "matches" in result
     assert isinstance(result["matches"], list)
     assert "resolved_by" in result
-    assert result["resolved_by"] in ("opencode", "fallback")
+    assert result["resolved_by"] in ("opencode-agent", "fallback")
 
 
 def test_registry_http_resolve_prerequisites_and_registry_dump(registry_available):
@@ -270,7 +270,7 @@ def test_registry_http_resolve_prerequisites_and_registry_dump(registry_availabl
     assert r.status_code == 200
     result = r.json()["result"]
     resolved_by = result.get("resolved_by")
-    if resolved_by == "opencode":
+    if resolved_by == "opencode-agent":
         for match in result.get("matches", []):
             assert "prerequisites" in match
             assert isinstance(match["prerequisites"], list)
@@ -440,4 +440,3 @@ def test_registry_http_error_handling(registry_available):
         data = r.json()
         assert data.get("interface") == "cli", label
         assert data.get("version") == "1.0", label
-

@@ -2,34 +2,37 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     git \
     bash \
+    nodejs \
+    npm \
     python3 \
     python-is-python3 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd -m -s /bin/bash op \
-    && echo "op ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/op \
-    && chmod 0440 /etc/sudoers.d/op
+RUN useradd -m -s /bin/bash op
 
 USER op
 WORKDIR /home/op
 
-RUN curl -sSfL https://opencode.ai/install | bash
+RUN npm install --global opencode-ai@0.6.4
 
 ENV PATH="/home/op/.local/bin:/home/op/.opencode/bin:$PATH"
 
 COPY --chown=op:op .opencode/ /home/op/project/.opencode/
 COPY --chown=op:op registry_agent/ /home/op/project/registry_agent/
+COPY --chown=op:op opencode.sidecar.json.template /home/op/project/opencode.sidecar.json.template
+COPY --chown=op:op auth.sidecar.json.template /home/op/project/auth.sidecar.json.template
+COPY --chown=op:op scripts/render-opencode-runtime.sh /home/op/project/scripts/render-opencode-runtime.sh
+COPY --chown=op:op scripts/start-opencode.sh /home/op/project/scripts/start-opencode.sh
 
 RUN mkdir -p /home/op/.config/opencode && \
-    cp -r /home/op/project/.opencode/. /home/op/.config/opencode/
+    cp -r /home/op/project/.opencode/. /home/op/.config/opencode/ && \
+    chmod +x /home/op/project/scripts/render-opencode-runtime.sh /home/op/project/scripts/start-opencode.sh
 
 WORKDIR /home/op/project
 
-CMD ["bash", "-lc", "opencode serve --hostname 0.0.0.0"]
+CMD ["bash", "/home/op/project/scripts/start-opencode.sh"]

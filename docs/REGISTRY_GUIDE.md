@@ -38,19 +38,19 @@ Runs `registry_agent/core.py` directly — no server dependency. Use in `opencod
 
 ```sh
 # List services
-uv run python registry_agent/core.py list
+python3 registry_agent/core.py list
 
 # Get one service
-uv run python registry_agent/core.py get tmf620/catalogmgt
+python3 registry_agent/core.py get tmf620/catalogmgt
 
 # Semantic resolve (returns raw dump for agent to reason over)
-uv run python registry_agent/core.py resolve I need to manage product orders
+python3 registry_agent/core.py resolve I need to manage product orders
 
 # Register
-uv run python registry_agent/core.py register '{"id":"...","url":"...","handles":"..."}'
+python3 registry_agent/core.py register '{"id":"...","url":"...","handles":"..."}'
 
 # Unregister
-uv run python registry_agent/core.py unregister tmf622/ordermgt
+python3 registry_agent/core.py unregister tmf622/ordermgt
 ```
 
 ### Path 2: HTTP Server (Network, LLM-Powered)
@@ -83,6 +83,8 @@ curl -s -X POST http://localhost:7700/cli/registry \
 **For LLM-powered resolve to work:**
 
 - `docker-compose.registry.yml` starts an `opencode` sidecar on port 4096
+- keep model and auth values in the ignored `.env.opencode` file
+- start from `.env.opencode.example`
 - set `OPENCODE_URL` only if you want to target an external opencode instance
 - If opencode is unavailable, resolve falls back to returning the raw dump
 
@@ -336,6 +338,11 @@ curl -s -X POST http://localhost:7700/cli/registry \
   - Default: `http://127.0.0.1:4096`
   - In compose: `http://opencode:4096`
   - Example: `OPENCODE_URL=http://opencode.internal:4096 uv run registry-server`
+- `.env.opencode` — local-only env file for the sidecar
+  - `MODEL`
+  - `AUTH_PROVIDER`
+  - `API_KEY`
+  - Start from `.env.opencode.example`
 
 ### Startup Behavior
 

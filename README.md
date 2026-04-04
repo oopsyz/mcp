@@ -132,7 +132,6 @@ Use the TMF620 compose file for the mock API + MCP server, and a separate compos
 
 ```bash
 docker compose -f docker-compose.yml up --build
-# registry only
 docker compose -f docker-compose.registry.yml up --build
 ```
 
@@ -146,10 +145,39 @@ Registry service exposes:
 
 - registry server at `http://localhost:7700`
 
+The registry compose file now includes an `opencode` sidecar for LLM-powered
+resolve. That keeps the registry deployment self-contained without bundling it
+into the TMF620 stack.
+
 The containers use environment overrides rather than rewriting config files. Set them in the matching compose file, or use a `.env` file with Docker Compose:
 
 - `TMF620_API_URL`
 - `OPENCODE_URL` for the registry, only if you want to point at an external opencode instance instead of the compose sidecar
+
+For the registry sidecar's model and auth, keep secrets in the ignored
+`.env.opencode` file. Start from the checked-in template:
+
+```bash
+cp .env.opencode.example .env.opencode
+```
+
+Required keys in `.env.opencode`:
+
+- `MODEL`
+- `AUTH_PROVIDER`
+- `API_KEY`
+
+To make the local pre-commit secret guard active, run:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+You can also run the same check manually:
+
+```bash
+./scripts/check-secret-files.sh
+```
 
 ![Quick start](docs/assets/quick_start.png)
 
@@ -473,7 +501,6 @@ The token benchmark fetches the MCP tool list from the running server, so the st
 
 Start the stack first:
 
-- `docker compose up --build`
 - `docker compose -f docker-compose.registry.yml up --build`
 - or `uv run tmf620-mcp-server`
 

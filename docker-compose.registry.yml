@@ -3,10 +3,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.opencode
+    env_file:
+      - .env.opencode
+    volumes:
+      - ./registry_agent/data:/home/op/project/registry_agent/data
     ports:
       - "4096:4096"
     healthcheck:
-      test: ["CMD", "python3", "-c", "import socket; s = socket.create_connection(('127.0.0.1', 4096), 2); s.close()"]
+      test: ["CMD", "curl", "-f", "http://localhost:4096/global/health"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -20,6 +24,9 @@ services:
         condition: service_healthy
     environment:
       OPENCODE_URL: http://opencode:4096
+      OPENCODE_AGENT: service-registry
+    volumes:
+      - ./registry_agent/data:/app/registry_agent/data
     ports:
       - "7700:7700"
     healthcheck:

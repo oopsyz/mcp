@@ -4,7 +4,7 @@ Core registry operations on ``registry_agent/data/registry.md``.
 This module has no web framework dependencies.  It is imported by both:
 
 - ``registry_agent/server.py``  (FastAPI + MCP — network path)
-- OpenCode skill              (``python registry_agent/core.py <cmd>`` — local path)
+- OpenCode skill              (``python3 registry_agent/core.py <cmd>`` — local path)
 """
 
 import json

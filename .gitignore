@@ -42,6 +42,21 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+.env.registry
+.env.registry.local
+.env.opencode
+.env.opencode.local
 .cursor
 .kiro
+
+# OpenCode runtime config and auth
+auth.json
+opencode.auth.json
+opencode.local.json
+.opencode-runtime/
+.config/opencode/
+.local/share/opencode/
+docker-compose.registry.override.yml
+.githooks/
+scripts/check-secret-files.ps1
 

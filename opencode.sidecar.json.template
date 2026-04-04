@@ -1,0 +1,5 @@
+{
+  "autoupdate": false,
+  "model": "__OPENCODE_MODEL__",
+  "$schema": "https://opencode.ai/config.json"
+}
