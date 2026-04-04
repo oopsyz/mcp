@@ -446,12 +446,8 @@ curl http://localhost:7701/health
 curl http://localhost:7700/health
 curl -X POST http://localhost:7700/cli/registry -H "Content-Type: application/json" -d '{"command":"list"}'
 
-# Standalone scripts
-python tests/conformance_test.py
-python tests/test_cli_api.py
-python tests/test_registry.py
-python tests/edge_test.py
-pytest tests/test_suite.py
+# Pytest suite
+pytest tests
 ```
 
 ## Token Benchmark

@@ -33,22 +33,22 @@ def _fmt(n: int) -> str:
     return f"{n:>7}"
 
 
-cli_tool_def = json.dumps(
-    {
-        "name": "tmf620_cli",
-        "description": "TMF620 CLI dispatcher. Use help to discover commands.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "command": {"type": "string", "description": "Command to run"},
-                "args": {"type": "object", "description": "Command arguments"},
-            },
-            "required": ["command"],
-        },
-    }
-)
-
 def main():
+    cli_tool_def = json.dumps(
+        {
+            "name": "tmf620_cli",
+            "description": "TMF620 CLI dispatcher. Use help to discover commands.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Command to run"},
+                    "args": {"type": "object", "description": "Command arguments"},
+                },
+                "required": ["command"],
+            },
+        }
+    )
+
     cli_catalog, cli_catalog_raw = _request_raw("POST", CLI_URL, {"command": "help"})
     cli_discovery = json.dumps(
         {

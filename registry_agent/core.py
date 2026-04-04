@@ -46,9 +46,35 @@ def _normalize_key(raw: str) -> str:
 def _validate_service_entry(service: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     cli = service.get("cli")
-    if cli is not None:
-        if not isinstance(cli, str) or not cli.startswith("/cli/"):
-            errors.append("CLI must be a string starting with '/cli/'.")
+    if not isinstance(cli, str) or not cli.strip():
+        errors.append("CLI is required and must be a non-empty string.")
+    elif not cli.startswith("/cli/"):
+        errors.append("CLI must start with '/cli/'.")
+
+    handles = service.get("handles")
+    if not isinstance(handles, str) or not handles.strip():
+        errors.append("Handles is required and must be a non-empty string.")
+
+    use_when = service.get("use_when")
+    if not isinstance(use_when, str) or not use_when.strip():
+        errors.append("Use when is required and must be a non-empty string.")
+
+    owner = service.get("owner")
+    if not isinstance(owner, str) or not owner.strip():
+        errors.append("Owner is required and must be a non-empty string.")
+
+    tags = service.get("tags")
+    if tags is not None:
+        if not isinstance(tags, list) or any(not isinstance(tag, str) or not tag.strip() for tag in tags):
+            errors.append("Tags must be a list of non-empty strings when provided.")
+
+    mcp = service.get("mcp")
+    if mcp is not None and (not isinstance(mcp, str) or not mcp.strip()):
+        errors.append("MCP must be a non-empty string when provided.")
+
+    url = service.get("url")
+    if not isinstance(url, str) or not url.strip():
+        errors.append("URL is required and must be a non-empty string.")
     return errors
 
 

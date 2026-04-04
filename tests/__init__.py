@@ -1,1 +1,1 @@
-"""Pytest package for integration wrappers and standalone test scripts."""
+"""Pytest package for integration tests."""

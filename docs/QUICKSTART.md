@@ -134,7 +134,7 @@ You can override the config path with `TMF620_CONFIG_PATH`.
 - Use compact `GET /cli/tmf620/catalogmgt` for discovery, `GET /cli/tmf620/catalogmgt?verbose=true` only when you need the richer catalog, compact group help for branch selection, and detailed leaf help only when you are ready to invoke.
 - The MCP server is now a thin adapter over the same shared client logic.
 - The shared command registry lives in `tmf620/commands.py`.
-- The MCP adapter in this repo exposes 40 tools: 38 generated command routes plus 2 compatibility tools.
+- The MCP adapter in this repo exposes 38 tools.
 - If the API is not running at the configured URL, both the HTTP CLI API and MCP server will fail.
 
 
