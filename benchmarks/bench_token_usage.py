@@ -1,26 +1,29 @@
-﻿import json
-import subprocess
+import json
+import asyncio
 import sys
-from pathlib import Path
+from typing import Any
+
+import requests
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
 
 BASE = "http://localhost:7701"
 CLI_URL = f"{BASE}/cli/tmf620/catalogmgt"
-REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _request_raw(
     method: str, url: str, payload: dict | None = None
 ) -> tuple[dict, str]:
-    cmd = ["curl", "-sf"]
-    if method.upper() != "GET":
-        cmd.extend(["-X", method.upper()])
-    cmd.append(url)
-    if payload is not None:
-        cmd.extend(["-H", "Content-Type: application/json", "-d", json.dumps(payload)])
-
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-    assert r.returncode == 0, f"curl failed: {r.stderr}"
-    return json.loads(r.stdout), r.stdout
+    method = method.upper()
+    if method == "GET":
+        r = requests.get(url, timeout=30)
+    else:
+        r = requests.request(method, url, json=payload, timeout=30)
+    try:
+        parsed = r.json()
+    except ValueError:
+        parsed = {"status_code": r.status_code, "body": r.text}
+    return parsed, r.text
 
 
 def _tokens(text: str) -> int:
@@ -31,6 +34,14 @@ def _fmt(n: int) -> str:
     if n >= 1000:
         return f"{n:>7,}"
     return f"{n:>7}"
+
+
+async def _fetch_live_mcp_tools() -> list[dict[str, Any]]:
+    async with streamablehttp_client(f"{BASE}/mcp") as (read, write, _):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            tools = await session.list_tools()
+            return [tool.model_dump(mode="json") for tool in tools.tools]
 
 
 def main():
@@ -49,7 +60,7 @@ def main():
         }
     )
 
-    cli_catalog, cli_catalog_raw = _request_raw("POST", CLI_URL, {"command": "help"})
+    _, cli_catalog_raw = _request_raw("POST", CLI_URL, {"command": "help"})
     cli_discovery = json.dumps(
         {
             "tool_definition": cli_tool_def,
@@ -57,24 +68,8 @@ def main():
         }
     )
 
-    mcp_tool_defs_raw = subprocess.run(
-        [
-            "docker",
-            "compose",
-            "exec",
-            "tmf620-mcp",
-            "python",
-            "-c",
-            "import json; from tmf620.server import mcp; "
-            "print(json.dumps([t.model_dump() if hasattr(t, 'model_dump') else str(t) for t in mcp.tools]))",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        cwd=REPO_ROOT,
-    )
-    mcp_tool_defs = mcp_tool_defs_raw.stdout.strip().split("\n")[-1]
-    mcp_tool_defs_json = json.loads(mcp_tool_defs)
+    mcp_tool_defs = asyncio.run(_fetch_live_mcp_tools())
+    mcp_tool_defs_json = mcp_tool_defs
     mcp_tool_defs_str = json.dumps(mcp_tool_defs_json)
 
     CLI_TOOL_TOKENS = _tokens(cli_discovery)
@@ -82,8 +77,16 @@ def main():
 
     tests = [
         ("health", {"command": "health"}, ("GET", f"{BASE}/health", None)),
-        ("server-config", {"command": "config"}, ("GET", f"{BASE}/server-config", None)),
-        ("catalog list", {"command": "catalog list"}, ("GET", f"{BASE}/catalogs", None)),
+        (
+            "server-config",
+            {"command": "config"},
+            ("GET", f"{BASE}/server-config", None),
+        ),
+        (
+            "catalog list",
+            {"command": "catalog list"},
+            ("GET", f"{BASE}/catalogs", None),
+        ),
         (
             "catalog get",
             {"command": "catalog get", "args": {"catalog_id": "cat-001"}},
@@ -215,7 +218,7 @@ def main():
     )
 
     print(f"\n{'=' * 95}")
-    print(f"Full session cost = tool_defs × N_turns + payload_per_turn × N_turns")
+    print("Full session cost = tool_defs * N_turns + payload_per_turn * N_turns")
     print(f"{'=' * 95}")
 
     print(
@@ -252,5 +255,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
