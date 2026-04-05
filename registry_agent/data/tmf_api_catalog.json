@@ -1,0 +1,1335 @@
+{
+  "generated_from": "C:\\Projects\\vector_service\\data",
+  "total": 79,
+  "apis": [
+    {
+      "id": "TMF620",
+      "name": "Product Catalog Management",
+      "summary": "Product Catalog API is one of Catalog Management API Family. Product Catalog API goal is to provide a catalog of products",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF620-Product_Catalog_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "catalog",
+        "family",
+        "product",
+        "product catalog",
+        "product catalog management",
+        "tmf620"
+      ]
+    },
+    {
+      "id": "TMF621",
+      "name": "Trouble Ticket",
+      "summary": "TMF - 621 Trouble Ticket The Trouble Ticket API provides a standardized client interface to Trouble Ticket Management Systems for creating, tracking and managing trouble tickets as a result of an issue or problem identified by a customer or another system. Examples of Trouble Ticket API originators (clients) include CRM applications, network management or fault management systems, or other Trouble Ticket management systems (e.g",
+      "version": "5.0.1",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF621-Trouble_Ticket-v5.0.1.oas.yaml",
+      "keywords": [
+        "client",
+        "interface",
+        "ticket",
+        "tmf621",
+        "trouble",
+        "trouble ticket"
+      ]
+    },
+    {
+      "id": "TMF622",
+      "name": "ProductOrdering",
+      "summary": "TMF 622 - Product Ordering Management",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF622-ProductOrdering-v5.0.0.oas.yaml",
+      "keywords": [
+        "ordering",
+        "product",
+        "productordering",
+        "tmf622"
+      ]
+    },
+    {
+      "id": "TMF628",
+      "name": "Performance",
+      "summary": "TMF628 Performance Management API",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF628-Performance-v4.0.0.swagger.json",
+      "keywords": [
+        "performance",
+        "tmf628"
+      ]
+    },
+    {
+      "id": "TMF629",
+      "name": "Customer Management",
+      "summary": "TMF - 629 Customer Management",
+      "version": "5.0.1",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF629-Customer_Management-v5.0.1.oas.yaml",
+      "keywords": [
+        "customer",
+        "customer management",
+        "tmf629"
+      ]
+    },
+    {
+      "id": "TMF632",
+      "name": "Party Management",
+      "summary": "The party API provides standardized mechanism for party management such as creation, update, retrieval, deletion, and",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF632-Party_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "creation",
+        "deletion",
+        "party",
+        "party management",
+        "retrieval",
+        "tmf632",
+        "update"
+      ]
+    },
+    {
+      "id": "TMF633",
+      "name": "Service Catalog Management",
+      "summary": "The Service Catalog API is one of Catalog Management API Family. Service Catalog API goal is to provide a catalog of services",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF633_Service_Catalog_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "catalog",
+        "family",
+        "service",
+        "service catalog",
+        "service catalog management",
+        "tmf633"
+      ]
+    },
+    {
+      "id": "TMF634",
+      "name": "Resource Catalog Management",
+      "summary": "Resource Catalog API is one of Catalog Management API Family. Resource Catalog API goal is to provide a catalog of resources",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF634-Resource_Catalog_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "catalog",
+        "family",
+        "resource",
+        "resource catalog",
+        "resource catalog management",
+        "tmf634"
+      ]
+    },
+    {
+      "id": "TMF635",
+      "name": "Usage Management",
+      "summary": "TMF635 Usage Management provides a standaised mechanism for usage management such as creation, update, retrieval, import and export of a collection of rated and non-rated usage. A usage represents an event that is of interest to a billing system, and can have charges applied to it",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF635_Usage_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "creation",
+        "import",
+        "retrieval",
+        "standaised",
+        "tmf635",
+        "update",
+        "usage",
+        "usage management"
+      ]
+    },
+    {
+      "id": "TMF637",
+      "name": "ProductInventory",
+      "summary": "TMF 637 - Product Inventory Management",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF637-ProductInventory-v5.0.0.oas.yaml",
+      "keywords": [
+        "inventory",
+        "product",
+        "productinventory",
+        "tmf637"
+      ]
+    },
+    {
+      "id": "TMF638",
+      "name": "Service Inventory Management",
+      "summary": "The intent of this API is to provide a consistent/standardized mechanism to query and manipulate the Service inventory",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF638-Service_Inventory_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "consistent",
+        "intent",
+        "inventory",
+        "manipulate",
+        "query",
+        "service",
+        "service inventory",
+        "service inventory management",
+        "tmf638"
+      ]
+    },
+    {
+      "id": "TMF639",
+      "name": "API Resource Inventory Management",
+      "summary": "Resource Inventory API goal is to provide the ability to manage Resources",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF639_Resource_Inventory_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "ability",
+        "api resource inventory management",
+        "inventory",
+        "manage",
+        "resource",
+        "resource inventory",
+        "resources",
+        "tmf639"
+      ]
+    },
+    {
+      "id": "TMF640",
+      "name": "API Service Activation and Configuration",
+      "summary": "Service Activation and Configuration API goal is to provide the ability to activate and configure Service. This API features Monitor pattern allowing to manage service configuration/activation asynchronous request (server side will provide monitor as POST/PATCH response)",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF640_Service_Activation_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "ability",
+        "activate",
+        "activation",
+        "activation and",
+        "and configuration",
+        "api service activation and configuration",
+        "configuration",
+        "configure",
+        "service",
+        "service activation",
+        "tmf640"
+      ]
+    },
+    {
+      "id": "TMF641",
+      "name": "API ServiceOrdering",
+      "summary": "The Service Order API provides a standardized mechanism for managing Service Order, a type of order which can be used to place an order between internal Customer Order management system to service order management system or between a service provider and a partner and vice versa",
+      "version": "4.1.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF641_Service_Ordering_Management_API_v4.1.0_swagger.json",
+      "keywords": [
+        "api serviceordering",
+        "managing",
+        "order",
+        "place",
+        "service",
+        "serviceordering",
+        "tmf641",
+        "which"
+      ]
+    },
+    {
+      "id": "TMF642",
+      "name": "Alarm",
+      "summary": "Alarm Management API",
+      "version": "5.0.1",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF642_Alarm_v5.0.1.oas.yaml",
+      "keywords": [
+        "alarm",
+        "tmf642"
+      ]
+    },
+    {
+      "id": "TMF644",
+      "name": "Privacy",
+      "summary": "TMF - 644 Privacy",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF644-Privacy-v5.0.0.oas.yaml",
+      "keywords": [
+        "privacy",
+        "tmf644"
+      ]
+    },
+    {
+      "id": "TMF645",
+      "name": "Service Qualification Management",
+      "summary": "Service Qualification API is one of Pre-Ordering Management API Family. Service Qualification API goal is to provide service technical eligibility",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF645_Service_Qualification_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "family",
+        "ordering",
+        "qualification",
+        "service",
+        "service qualification",
+        "service qualification management",
+        "tmf645"
+      ]
+    },
+    {
+      "id": "TMF646",
+      "name": "Appointment",
+      "summary": "An Appointment is an arrangement to do something or meet someone at a particular time and place. It is previously made during an interaction or may be necessary to solve a customer problem or to deliver a product order item",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF646_Appointment_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "appointment",
+        "arrangement",
+        "particular",
+        "place",
+        "someone",
+        "something",
+        "tmf646"
+      ]
+    },
+    {
+      "id": "TMF648",
+      "name": "Quote",
+      "summary": "TMF 648 - Quote Management",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF648_Quote_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "quote",
+        "tmf648"
+      ]
+    },
+    {
+      "id": "TMF651",
+      "name": "Agreement Management",
+      "summary": "Agreement Management",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF651_Agreement_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "agreement",
+        "agreement management",
+        "tmf651"
+      ]
+    },
+    {
+      "id": "TMF652",
+      "name": "Resource Ordering Management",
+      "summary": "Resource Ordering Management",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF652_Resource_Order_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "ordering",
+        "resource",
+        "resource ordering",
+        "resource ordering management",
+        "tmf652"
+      ]
+    },
+    {
+      "id": "TMF653",
+      "name": "Service Test Management",
+      "summary": "Service Test Management API goal is to provide the ability to manage tests of provisioned Services",
+      "version": "4.2.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF653_Service_Test_Management_API_v4.2.0_swagger.json",
+      "keywords": [
+        "ability",
+        "manage",
+        "provisioned",
+        "service",
+        "service test",
+        "service test management",
+        "services",
+        "test",
+        "tests",
+        "tmf653"
+      ]
+    },
+    {
+      "id": "TMF654",
+      "name": "Prepay Balance Management",
+      "summary": "The Prepay Balance Management API enables consumers to manage the balance, recharge (top-up), transfer, reserve, unreserve, deduct and balance adjustments of a bucket. A bucket is understood in the context of this API to be an entity that keeps track of the balance available to use services",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF654_Prepay_Balance_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "balance",
+        "consumers",
+        "enables",
+        "manage",
+        "prepay",
+        "prepay balance",
+        "prepay balance management",
+        "recharge",
+        "tmf654",
+        "transfer"
+      ]
+    },
+    {
+      "id": "TMF655",
+      "name": "API ChangeManagement",
+      "summary": "API ChangeManagement",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF655_Change_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "api changemanagement",
+        "changemanagement",
+        "tmf655"
+      ]
+    },
+    {
+      "id": "TMF656",
+      "name": "Service Problem Management",
+      "summary": "in the Service domain. It can retrieve a Problem or a collection of Problems based on filter criteria; Partial update of Problems (including updating rules); Create a Problem (including default values and creation rules); Delete a Problem (for administration purposes) and Manage the",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF656-Service_Problem_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "domain",
+        "problem",
+        "service",
+        "service problem",
+        "service problem management",
+        "tmf656"
+      ]
+    },
+    {
+      "id": "TMF657",
+      "name": "Service Quality Management",
+      "summary": "Service Quality Management",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF657_Service_Quality_Management_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "quality",
+        "service",
+        "service quality",
+        "service quality management",
+        "tmf657"
+      ]
+    },
+    {
+      "id": "TMF662",
+      "name": "Entity Catalog Management",
+      "summary": "Entity Catalog API is one of Catalog Management API Family. Entity Catalog API goal is to provide a catalog of arbitrary entities, so that there will be no need for specific catalogs in addition to product, service, and resource",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF662_Entity_Catalog_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "catalog",
+        "entity",
+        "entity catalog",
+        "entity catalog management",
+        "family",
+        "tmf662"
+      ]
+    },
+    {
+      "id": "TMF663",
+      "name": "Shopping Cart",
+      "summary": "TMF - 663 Shopping Cart",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF663-Shopping_Cart-v5.0.0.oas.yaml",
+      "keywords": [
+        "cart",
+        "shopping",
+        "shopping cart",
+        "tmf663"
+      ]
+    },
+    {
+      "id": "TMF664",
+      "name": "Resource Function Activation and Configuration",
+      "summary": "Provisioning and lifecycle management of Resource Functions",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF664_Resource_Function_Activation_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "activation",
+        "activation and",
+        "and configuration",
+        "configuration",
+        "function",
+        "function activation",
+        "functions",
+        "lifecycle",
+        "provisioning",
+        "resource",
+        "resource function",
+        "tmf664"
+      ]
+    },
+    {
+      "id": "TMF666",
+      "name": "Account Management",
+      "summary": "Swagger for TMF666 Account Management API",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF666-Account_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "account",
+        "account management",
+        "swagger",
+        "tmf666"
+      ]
+    },
+    {
+      "id": "TMF667",
+      "name": "Document",
+      "summary": "TMF667 Document API describes the meta-data of a Document, such as the name, creationDate and lifecycle status. The (typically binary) body of this document (such as a Word.doc, PDF, Video clip, or Image) will be held in the associated Attachment(s) either by Ref or Value",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF667_Document_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "creationdate",
+        "describes",
+        "document",
+        "lifecycle",
+        "status",
+        "tmf667"
+      ]
+    },
+    {
+      "id": "TMF668",
+      "name": "Partnership Management",
+      "summary": "Partnership Management",
+      "version": "4.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF668_Partnership_Type_v4.0.0_swagger.json",
+      "keywords": [
+        "partnership",
+        "partnership management",
+        "tmf668"
+      ]
+    },
+    {
+      "id": "TMF669",
+      "name": "Party Role Management",
+      "summary": "TMF669 - Party Role Management API",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF669-Party_Role_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "party",
+        "party role",
+        "party role management",
+        "role",
+        "tmf669"
+      ]
+    },
+    {
+      "id": "TMF670",
+      "name": "Payment Method",
+      "summary": "TMF670 Defines a specific method of payment (e.g. direct debit with all details associated) - Main payment method attributes are its type, details, name, description, isPreffered, status, status date Payment Method",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF670_Payment_Method_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "defines",
+        "method",
+        "payment",
+        "payment method",
+        "specific",
+        "tmf670"
+      ]
+    },
+    {
+      "id": "TMF671",
+      "name": "Promotion Management",
+      "summary": "This API is used to provide the additional discount, voucher, bonus or gift to the customer who meets the pre-defined criteria. Using promotion, the enterprise is able to attract the users and encourage more consumption, especially continuous purchases",
+      "version": "4.1.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF671_Promotion_Management_API_v4.1.0_swagger.json",
+      "keywords": [
+        "additional",
+        "bonus",
+        "criteria",
+        "customer",
+        "defined",
+        "discount",
+        "meets",
+        "promotion",
+        "promotion management",
+        "tmf671",
+        "voucher"
+      ]
+    },
+    {
+      "id": "TMF672",
+      "name": "User Roles And Permissions",
+      "summary": "This API is used to manage the user account with which the customer or staff can log-in and log-off the system and the permission for the user to enter or operate the special information",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF672_User_Role_Permission_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "account",
+        "and permissions",
+        "customer",
+        "enter",
+        "manage",
+        "permission",
+        "permissions",
+        "roles",
+        "roles and",
+        "staff",
+        "system",
+        "tmf672",
+        "user",
+        "user roles",
+        "user roles and permissions",
+        "which"
+      ]
+    },
+    {
+      "id": "TMF673",
+      "name": "API Place - GeographicAddress",
+      "summary": "The Geographic Address API provides a standardized client interface to an Address management system. It allows looking for worldwide addresses",
+      "version": "4.0.1",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF673_Geographic_Address_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "address",
+        "api place - geographicaddress",
+        "client",
+        "geographic",
+        "geographicaddress",
+        "interface",
+        "place",
+        "place geographicaddress",
+        "system",
+        "tmf673"
+      ]
+    },
+    {
+      "id": "TMF674",
+      "name": "Geographic Site",
+      "summary": "This API covers the operations to manage (create, read, delete) sites that can be associated to a customer, an account, a service delivery or other entities. It defines a Site as a convenience class that allows to easily refer to places important to other entities, where a geographic place is the entity that can answer the question \u201cwhere?\u201d, allowing to determine where things are in relation to the earth's surface, and can be represented either in a textual structured way (geographic address) or as a geometry referred to a spatial reference system (geographic location)",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF674_Geographic_Site_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "associated",
+        "covers",
+        "create",
+        "customer",
+        "delete",
+        "geographic",
+        "geographic site",
+        "manage",
+        "operations",
+        "site",
+        "sites",
+        "tmf674"
+      ]
+    },
+    {
+      "id": "TMF675",
+      "name": "API GeographicLocation",
+      "summary": "A GeographicLocation is a pure-virtual super-class to the GeoJSON-aligned sub-types of Point (addresses and locations), MultiPoint, LineString (streets, highways and boundaries), MultiLineString and Polygon (countries, provinces, tracts of land). Use the @type attribute to specify which of these is being specified by the geometry attribute",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF675-GeographicLocation-v4.0.0.swagger.json",
+      "keywords": [
+        "aligned",
+        "api geographiclocation",
+        "class",
+        "geographiclocation",
+        "geojson",
+        "point",
+        "super",
+        "tmf675",
+        "types",
+        "virtual"
+      ]
+    },
+    {
+      "id": "TMF676",
+      "name": "Payment",
+      "summary": "This API provides the standardized client interface to Payment Systems for managing performed payments or refunds. Examples of Payment API originators (clients) include Web servers, mobile app servers, Contact center dashboards or retail store systems",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF676_Payment_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "client",
+        "interface",
+        "managing",
+        "payment",
+        "payments",
+        "performed",
+        "refunds",
+        "systems",
+        "tmf676"
+      ]
+    },
+    {
+      "id": "TMF677",
+      "name": "Usage Consumption",
+      "summary": "This API covers the consumption follow up function providing ongoing information about usages related to any subscribed products (voice, data, TV,\u2026) without having to wait for the invoice/customer bill. The information may concern usages charged against a bucket along with the remaining balance of the bucket",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF677-Usage_Consumption-v5.0.0.oas.yaml",
+      "keywords": [
+        "about",
+        "consumption",
+        "covers",
+        "follow",
+        "function",
+        "information",
+        "ongoing",
+        "providing",
+        "tmf677",
+        "usage",
+        "usage consumption"
+      ]
+    },
+    {
+      "id": "TMF678",
+      "name": "CustomerBill",
+      "summary": "The Customer Bill Management API allows to find and retrieve one or several customer bills (also called invoices) produced for a customer. A customer bill is an electronic or paper document produced at the end of the billing process",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF678-CustomerBill-v5.0.0.oas.yaml",
+      "keywords": [
+        "bills",
+        "called",
+        "customer",
+        "customerbill",
+        "invoices",
+        "produced",
+        "retrieve",
+        "several",
+        "tmf678"
+      ]
+    },
+    {
+      "id": "TMF679",
+      "name": "Product Offering Qualification",
+      "summary": "TMF 679 - Product Offering Qualification - June 2024",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF679-Product_Offering_Qualification-v5.0.0.oas.yaml",
+      "keywords": [
+        "offering",
+        "offering qualification",
+        "product",
+        "product offering",
+        "product offering qualification",
+        "qualification",
+        "tmf679"
+      ]
+    },
+    {
+      "id": "TMF680",
+      "name": "Recommendation",
+      "summary": "Recommendation API is used to recommend offering quickly based on the history and real-time context of customer. It is a real-time and personalized recommendation API",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF680_Recommendation_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "based",
+        "context",
+        "customer",
+        "history",
+        "offering",
+        "quickly",
+        "recommend",
+        "recommendation",
+        "tmf680"
+      ]
+    },
+    {
+      "id": "TMF681",
+      "name": "Communication Management",
+      "summary": "Communication Management",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF681_Communication_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "communication",
+        "communication management",
+        "tmf681"
+      ]
+    },
+    {
+      "id": "TMF683",
+      "name": "Party Interaction",
+      "summary": "TMF - 683 Party Interaction",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF683-Party_Interaction-v5.0.0.oas.yaml",
+      "keywords": [
+        "interaction",
+        "party",
+        "party interaction",
+        "tmf683"
+      ]
+    },
+    {
+      "id": "TMF687",
+      "name": "Stock Management",
+      "summary": "TMF 687 - Stock Management",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF687_Stock_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "stock",
+        "stock management",
+        "tmf687"
+      ]
+    },
+    {
+      "id": "TMF688",
+      "name": "Event Streaming",
+      "summary": "Event Streaming",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF688-Event-v4.0.0.swagger.json",
+      "keywords": [
+        "event",
+        "event streaming",
+        "streaming",
+        "tmf688"
+      ]
+    },
+    {
+      "id": "TMF691",
+      "name": "Federated ID",
+      "summary": "Federated ID",
+      "version": "4.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF691-FederatedIdentity-v4.0.0.swagger.json",
+      "keywords": [
+        "federated",
+        "federated id",
+        "tmf691"
+      ]
+    },
+    {
+      "id": "TMF696",
+      "name": "Risk Management",
+      "summary": "Risk Assessment API allows assessment of risks, such as party risk, risk associated with product offering, and risk associated with party role requesting a particular offering",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF696_Risk_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "assessment",
+        "associated",
+        "offering",
+        "party",
+        "product",
+        "risk",
+        "risk management",
+        "risks",
+        "tmf696"
+      ]
+    },
+    {
+      "id": "TMF697",
+      "name": "Work Order",
+      "summary": "TMF 697 - Work Order Management",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF697-WorkOrder-v4.0.0.swagger.json",
+      "keywords": [
+        "order",
+        "tmf697",
+        "work",
+        "work order"
+      ]
+    },
+    {
+      "id": "TMF699",
+      "name": "API Sales",
+      "summary": "This API provides interfaces for Sales Lead, Sales Opportunity, Sales Quote and the other management capabilities to support the sales activities to build relationship with the prospect customer who could be a person or organization that has an interest in the goods and/or services and possibly become the actual customers with one or more Subscriptions",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF699_Sales_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "api sales",
+        "capabilities",
+        "interfaces",
+        "opportunity",
+        "other",
+        "quote",
+        "sales",
+        "tmf699"
+      ]
+    },
+    {
+      "id": "TMF700",
+      "name": "API ShippingOrder",
+      "summary": "A Shipping Order is a document used by a business to specify what items are to be transferred by a logisitic partner from a storage location or warehouse to a party in a different location.When goods are sent to the customers, shipment information can be provided to them so they can be aware of when things were shipped and when they will arrive. The service provider creates a Shipping Order which can be sent to a Logistic Partner to manage the physical shipment",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF700-ShippingOrder-v4.0.0.swagger.json",
+      "keywords": [
+        "api shippingorder",
+        "business",
+        "document",
+        "items",
+        "logisitic",
+        "order",
+        "shipping",
+        "shippingorder",
+        "specify",
+        "tmf700",
+        "transferred"
+      ]
+    },
+    {
+      "id": "TMF701",
+      "name": "ProcessFlow Management",
+      "summary": "TMF 701 - ProcessFlow API",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF701-ProcessFlow-v4.0.0.swagger.json",
+      "keywords": [
+        "processflow",
+        "processflow management",
+        "tmf701"
+      ]
+    },
+    {
+      "id": "TMF702",
+      "name": "API Resource Activation and Configuration",
+      "summary": "Resource Activation API goal is to provide the ability to activate Resources",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF702_Resource_Activation_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "ability",
+        "activate",
+        "activation",
+        "activation and",
+        "and configuration",
+        "configuration",
+        "resource",
+        "resource activation",
+        "resources",
+        "tmf702"
+      ]
+    },
+    {
+      "id": "TMF703",
+      "name": "Entity Inventory",
+      "summary": "The intent of this API is to provide a consistent/standardized mechanism to query and manipulate the Entity inventory",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF703-EntityInventory-v4.0.0.swagger.json",
+      "keywords": [
+        "consistent",
+        "entity",
+        "entity inventory",
+        "intent",
+        "inventory",
+        "manipulate",
+        "query",
+        "tmf703"
+      ]
+    },
+    {
+      "id": "TMF704",
+      "name": "Test Case Management",
+      "summary": "This API provides a mechanism to manage test case models and related artifacts",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF704_Test_Case_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "artifacts",
+        "case",
+        "manage",
+        "models",
+        "related",
+        "test",
+        "test case",
+        "test case management",
+        "tmf704"
+      ]
+    },
+    {
+      "id": "TMF705",
+      "name": "Test Environment Management",
+      "summary": "This API provides a mechanism to manage test environments and related artifacts",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF705_Test_Environment_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "artifacts",
+        "environment",
+        "environments",
+        "manage",
+        "related",
+        "test",
+        "test environment",
+        "test environment management",
+        "tmf705"
+      ]
+    },
+    {
+      "id": "TMF706",
+      "name": "Test Data",
+      "summary": "This API provides a mechanism to manage test data instances and schemas",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF706_Test_Data_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "data",
+        "instances",
+        "manage",
+        "schemas",
+        "test",
+        "test data",
+        "tmf706"
+      ]
+    },
+    {
+      "id": "TMF707",
+      "name": "Test Result",
+      "summary": "This API provides a mechanism to manage test results",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF707_Test_Result_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "manage",
+        "result",
+        "results",
+        "test",
+        "test result",
+        "tmf707"
+      ]
+    },
+    {
+      "id": "TMF708",
+      "name": "Test Execution",
+      "summary": "This API provides the test case, test suite, and non-functional test case model execution capability",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF708_Test_Execution_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "capability",
+        "execution",
+        "functional",
+        "model",
+        "suite",
+        "test",
+        "test execution",
+        "tmf708"
+      ]
+    },
+    {
+      "id": "TMF709",
+      "name": "Test Scenario Management",
+      "summary": "This API provides a mechanism to manage test scenarios",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF709_Test_Scenario_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "manage",
+        "scenario",
+        "scenarios",
+        "test",
+        "test scenario",
+        "test scenario management",
+        "tmf709"
+      ]
+    },
+    {
+      "id": "TMF710",
+      "name": "General Test Artifact Management",
+      "summary": "This API provides a mechanism to manage general test artifacts",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF710_General_Test_Artifact_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "artifact",
+        "artifacts",
+        "general",
+        "general test",
+        "general test artifact management",
+        "manage",
+        "test",
+        "test artifact",
+        "tmf710"
+      ]
+    },
+    {
+      "id": "TMF716",
+      "name": "Resource Reservation",
+      "summary": "TMF 716 - Resource Reservation Management",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF716_ResourceReservation_v4.0.0_swagger.json",
+      "keywords": [
+        "reservation",
+        "resource",
+        "resource reservation",
+        "tmf716"
+      ]
+    },
+    {
+      "id": "TMF720",
+      "name": "Digital Identity Management",
+      "summary": "Digital Identity Management API goal is to provide the ability to manage a digital identity. This digital identity allows to identify an individual, a resource, or a partyRole (a specific role - or set of roles - for a given individual)",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF720_Digital_Identity_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "ability",
+        "digital",
+        "digital identity",
+        "digital identity management",
+        "identity",
+        "manage",
+        "tmf720"
+      ]
+    },
+    {
+      "id": "TMF724",
+      "name": "Incident",
+      "summary": "TMF - 724 Incident",
+      "version": "4.0.1",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF724_Incident_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "incident",
+        "tmf724"
+      ]
+    },
+    {
+      "id": "TMF730",
+      "name": "Software and Compute Entity Management",
+      "summary": "This API introduces schemas mapping the Software and Compute ABE to the TM Forum Open API data model",
+      "version": "4.0.2",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF730_Software_And_Compute_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "and compute",
+        "compute",
+        "compute entity",
+        "entity",
+        "forum",
+        "introduces",
+        "mapping",
+        "model",
+        "schemas",
+        "software",
+        "software and",
+        "software and compute entity management",
+        "tmf730"
+      ]
+    },
+    {
+      "id": "TMF735",
+      "name": "CDR Transaction Management",
+      "summary": "CDR Transaction Management API goal is to provide the ability to manage a CDR Transaction. This CDR Transaction allows to manage CDR Transactions that define how revenue share is calculated, billed and paid between an enterprise with one or more other parties",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF735-CDR_Transaction_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "ability",
+        "cdr transaction",
+        "cdr transaction management",
+        "manage",
+        "tmf735",
+        "transaction"
+      ]
+    },
+    {
+      "id": "TMF736",
+      "name": "Revenue Sharing Algorithm Management",
+      "summary": "Revenue Sharing Algorithm Management API goal is to provide the Algorithm to calculate a revenue share",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF736-Revenue_Sharing_Algorithm_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "algorithm",
+        "calculate",
+        "revenue",
+        "revenue sharing",
+        "revenue sharing algorithm management",
+        "share",
+        "sharing",
+        "sharing algorithm",
+        "tmf736"
+      ]
+    },
+    {
+      "id": "TMF737",
+      "name": "Revenue Sharing Report Management",
+      "summary": "Revenue Sharing Report Management API goal is to provide the report of a revenue sharing",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF737-Revenue_Sharing_Report_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "report",
+        "revenue",
+        "revenue sharing",
+        "revenue sharing report management",
+        "sharing",
+        "sharing report",
+        "tmf737"
+      ]
+    },
+    {
+      "id": "TMF738",
+      "name": "Revenue Sharing Model Management",
+      "summary": "Revenue Sharing Model Management API goal is to provide the ability to manage a revenue sharing model. This revenue sharing model allows to contains revenue sharing models that define how revenue is shared by an enterprise with one or more other parties",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF738-Revenue_Sharing_Model_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "ability",
+        "manage",
+        "model",
+        "revenue",
+        "revenue sharing",
+        "revenue sharing model management",
+        "sharing",
+        "sharing model",
+        "tmf738"
+      ]
+    },
+    {
+      "id": "TMF760",
+      "name": "ProductConfiguration",
+      "summary": "The Product Configuration API drives the configuration of new product offerings and modification of existing products for various user engagement channels. The Product Configuration API uses product catalog data, policy data, and existing product inventory data to assist engagement managent systems with product configuration",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF760-ProductConfiguration-v5.0.0.oas.yaml",
+      "keywords": [
+        "configuration",
+        "drives",
+        "existing",
+        "modification",
+        "offerings",
+        "product",
+        "productconfiguration",
+        "tmf760"
+      ]
+    },
+    {
+      "id": "TMF771",
+      "name": "Resource Usage Management",
+      "summary": "TMF771 Resource Usage Management provides a standaised mechanism for usage management such as creation, update, retrieval, import and export of a collection of resource usage. A Resource usage represents is an occurrence of usage on a Resource, which can be further used to generate interest to a billing system, and can have charges applied to it",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF771-Resource_Usage_Management-v5.0.0.oas.yaml",
+      "keywords": [
+        "creation",
+        "resource",
+        "resource usage",
+        "resource usage management",
+        "retrieval",
+        "standaised",
+        "tmf771",
+        "update",
+        "usage"
+      ]
+    },
+    {
+      "id": "TMF908",
+      "name": "IoT Device Management",
+      "summary": "IoT Device Management",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF908-IoTAgentAndDevice-v4.0.0.swagger.json",
+      "keywords": [
+        "device",
+        "iot device",
+        "iot device management",
+        "tmf908"
+      ]
+    },
+    {
+      "id": "TMF914",
+      "name": "IoT Service Management Component Suite",
+      "summary": "IoT Service Management Component Suite",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF914-IotService-v4.0.0.swagger.json",
+      "keywords": [
+        "component",
+        "component suite",
+        "iot service",
+        "iot service management component suite",
+        "service",
+        "service component",
+        "suite",
+        "tmf914"
+      ]
+    },
+    {
+      "id": "TMF915",
+      "name": "Ai Management",
+      "summary": "AI Management API",
+      "version": "4.0.0",
+      "source_format": "json",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_json\\TMF915_AI_Management_API_v4.0.0_swagger.json",
+      "keywords": [
+        "ai management",
+        "tmf915"
+      ]
+    },
+    {
+      "id": "TMF921",
+      "name": "Intent Management",
+      "summary": "Intent Management",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF921_Intent_Management_v5.0.0.oas.yaml",
+      "keywords": [
+        "intent",
+        "intent management",
+        "tmf921"
+      ]
+    },
+    {
+      "id": "TMF931",
+      "name": "Open Gateway Operate API Onboarding and Ordering",
+      "summary": "API Ordering, Developer & Application Onboarding and Management",
+      "version": "5.1.2",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF931-Open_Gateway_Operate_API_Onboarding_and_Ordering-v5.1.2.oas.yaml",
+      "keywords": [
+        "and ordering",
+        "application",
+        "developer",
+        "gateway",
+        "gateway operate",
+        "onboarding",
+        "onboarding and",
+        "open",
+        "open gateway",
+        "operate",
+        "operate onboarding",
+        "ordering",
+        "tmf931"
+      ]
+    },
+    {
+      "id": "TMF936",
+      "name": "Open Gateway Operate API - Product Catalog",
+      "summary": "Open Gateway Operate API Product Catalog",
+      "version": "5.0.0",
+      "source_format": "yaml",
+      "source_file": "C:\\Projects\\vector_service\\data\\api_yaml\\TMF936-Open_Gateway_Operate_API_-_Product_Catalog-v5.0.0.oas.yaml",
+      "keywords": [
+        "catalog",
+        "gateway",
+        "gateway operate",
+        "open",
+        "open gateway",
+        "operate",
+        "operate product",
+        "product",
+        "product catalog",
+        "tmf936"
+      ]
+    }
+  ]
+}

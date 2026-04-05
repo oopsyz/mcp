@@ -15,6 +15,10 @@ Manages and queries the CLI service registry stored in `registry_agent/data/regi
 
 Use `registry_agent/data/registry.md` as the source of truth for service discovery. Read the registry directly and reason over `handles`, `use_when`, `tags`, `dependencies`, and `status`.
 
+When a response mentions a TMF API, validate the TMF ID and name against
+`.opencode/skills/registry/references/tmf-api-reference-catalog.md`. Treat that
+TMF catalog as reference-only, not as a service registry.
+
 Use `registry_agent/core.py` only for deterministic maintenance operations:
 
 ```bash

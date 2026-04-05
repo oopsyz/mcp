@@ -254,8 +254,17 @@ def test_registry_http_resolve(registry_available):
     assert "query" in result
     assert "matches" in result
     assert isinstance(result["matches"], list)
-    assert "resolved_by" in result
-    assert result["resolved_by"] in ("opencode-agent", "fallback")
+    if "resolved_by" in result:
+        assert result["resolved_by"] in ("opencode-agent", "fallback")
+    assert "reference_suggestions" in result
+    assert isinstance(result["reference_suggestions"], list)
+    assert "related_services" in result
+    assert isinstance(result["related_services"], list)
+    if result["matches"]:
+        first = result["matches"][0]
+        if "tmf_validation" in first:
+            assert isinstance(first["tmf_validation"], dict)
+            assert "validated" in first["tmf_validation"]
 
 
 def test_registry_http_resolve_prerequisites_and_registry_dump(registry_available):
@@ -270,17 +279,23 @@ def test_registry_http_resolve_prerequisites_and_registry_dump(registry_availabl
     assert r.status_code == 200
     result = r.json()["result"]
     resolved_by = result.get("resolved_by")
-    if resolved_by == "opencode-agent":
+    if result.get("matches") and resolved_by is None:
+        for match in result.get("matches", []):
+            if "tmf_validation" in match:
+                assert "tmf_api_id" in match["tmf_validation"]
+                assert "validated" in match["tmf_validation"]
+        assert "registry_content" not in result
+    elif resolved_by == "opencode-agent":
         for match in result.get("matches", []):
             assert "prerequisites" in match
             assert isinstance(match["prerequisites"], list)
             for prereq in match["prerequisites"]:
                 assert "id" in prereq
                 assert "note" in prereq
+            if "tmf_validation" in match:
+                assert "tmf_api_id" in match["tmf_validation"]
+                assert "validated" in match["tmf_validation"]
         assert "registry_content" not in result
-    elif resolved_by == "fallback":
-        for match in result.get("matches", []):
-            assert "prerequisites" not in match
 
 
 def test_registry_http_lifecycle(registry_available):

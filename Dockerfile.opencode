@@ -15,10 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN useradd -m -s /bin/bash op
 
+RUN npm install --global opencode-ai@1.3.3
+
 USER op
 WORKDIR /home/op
-
-RUN npm install --global opencode-ai@0.6.4
 
 ENV PATH="/home/op/.local/bin:/home/op/.opencode/bin:$PATH"
 

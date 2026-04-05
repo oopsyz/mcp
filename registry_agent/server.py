@@ -14,6 +14,7 @@ import logging
 import os
 import re
 import time
+from functools import lru_cache
 from typing import Any
 
 from contextlib import asynccontextmanager
@@ -64,13 +65,42 @@ CLI_ROUTE = f"/cli/{CLI_NAMESPACE}"
 OPENCODE_URL = os.environ.get("OPENCODE_URL", "http://127.0.0.1:4096")
 OPENCODE_AGENT = os.environ.get("OPENCODE_AGENT", "service-registry")
 OPENCODE_TIMEOUT_SECONDS = float(os.environ.get("OPENCODE_TIMEOUT_SECONDS", "30"))
+OPENCODE_REQUEST_TIMEOUT_SECONDS = float(
+    os.environ.get("OPENCODE_REQUEST_TIMEOUT_SECONDS", str(OPENCODE_TIMEOUT_SECONDS))
+)
+TMF_CATALOG_JSON = os.environ.get(
+    "TMF_CATALOG_JSON",
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "tmf_api_catalog.json")),
+)
 
 PROGRAMMATIC_RESOLVE_PROMPT = """\
 PROGRAMMATIC RESOLVE REQUEST
 
 Query: {query}
 
-Return only the JSON object required by the programmatic resolve contract."""
+Use the live registry.md in this project as the source of truth for callable
+services across the whole registry.
+
+Use {tmf_catalog_json} only as a reference-only validation corpus for TMF API
+IDs and names. It is not a service registry. Do not use it for general service
+discovery.
+
+When a registry response mentions a TMF API, validate that the TMF ID and name
+are real and correctly paired against the TMF catalog JSON before returning the
+answer.
+
+You may inspect local files and use shell tools such as rg, cat, or jq if that
+helps you verify an answer. Do not guess when the local files can confirm it.
+
+When the query implies TMF API selection or validation:
+- verify the candidate TMF API IDs and names against the TMF catalog JSON
+- prefer the registry entry over model memory for service selection
+- if a service match depends on a specific TMF API, mention that in the
+  rationale/evidence fields inside the JSON
+
+Return only the JSON object required by the programmatic resolve contract.
+Be helpful even when there is no match: include interpreted_intent, summary,
+and related_services in the JSON response."""
 
 
 def _now() -> str:
@@ -88,9 +118,10 @@ def _extract_response_text(response_data: dict) -> str:
     texts = []
     for part in parts:
         if isinstance(part, dict):
-            if "text" in part:
+            part_type = str(part.get("type", "")).strip().lower()
+            if part_type == "text" and "text" in part:
                 texts.append(part["text"])
-            elif "content" in part:
+            elif part_type == "content" and "content" in part:
                 texts.append(part["content"])
         elif isinstance(part, str):
             texts.append(part)
@@ -162,6 +193,130 @@ def _parse_json_from_text(text: str) -> dict | None:
     return None
 
 
+@lru_cache(maxsize=1)
+def _load_tmf_catalog() -> dict[str, dict[str, Any]]:
+    try:
+        with open(TMF_CATALOG_JSON, encoding="utf-8") as fh:
+            payload = json.load(fh)
+    except Exception as exc:
+        logger.warning("failed to load TMF catalog %s: %s", TMF_CATALOG_JSON, exc)
+        return {}
+
+    apis = payload.get("apis", [])
+    result: dict[str, dict[str, Any]] = {}
+    if isinstance(apis, list):
+        for item in apis:
+            if not isinstance(item, dict):
+                continue
+            api_id = str(item.get("id", "")).strip().upper()
+            if api_id:
+                result[api_id] = item
+    return result
+
+
+def _extract_tmf_api_ids(*texts: str) -> list[str]:
+    found: list[str] = []
+    seen: set[str] = set()
+    for text in texts:
+        if not text:
+            continue
+        for match in re.findall(r"\bTMF\d{3,4}\b", str(text), flags=re.IGNORECASE):
+            api_id = match.upper()
+            if api_id not in seen:
+                seen.add(api_id)
+                found.append(api_id)
+    return found
+
+
+def _match_service_tmf_api(service: dict[str, Any]) -> str | None:
+    candidates = _extract_tmf_api_ids(
+        str(service.get("id", "")),
+        str(service.get("handles", "")),
+        str(service.get("use_when", "")),
+        " ".join(str(tag) for tag in service.get("tags", []) if isinstance(tag, str)),
+    )
+    if candidates:
+        return candidates[0]
+    service_id = str(service.get("id", ""))
+    match = re.match(r"^(tmf\d{3,4})/", service_id, flags=re.IGNORECASE)
+    if match:
+        return match.group(1).upper()
+    return None
+
+
+def _build_tmf_validation(api_id: str | None) -> dict[str, Any] | None:
+    if not api_id:
+        return None
+    catalog = _load_tmf_catalog()
+    entry = catalog.get(api_id.upper())
+    if not entry:
+        return {
+            "validated": False,
+            "tmf_api_id": api_id.upper(),
+            "tmf_api_name": None,
+        }
+    return {
+        "validated": True,
+        "tmf_api_id": api_id.upper(),
+        "tmf_api_name": entry.get("name"),
+    }
+
+
+def _build_reference_suggestions(result: dict[str, Any]) -> list[dict[str, Any]]:
+    catalog = _load_tmf_catalog()
+    texts: list[str] = [str(result.get("summary", ""))]
+    for key in ("related_services",):
+        values = result.get(key, [])
+        if isinstance(values, list):
+            for item in values:
+                if isinstance(item, dict):
+                    texts.append(str(item.get("reason", "")))
+                    texts.append(str(item.get("id", "")))
+
+    suggestions: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for api_id in _extract_tmf_api_ids(*texts):
+        entry = catalog.get(api_id)
+        if not entry or api_id in seen:
+            continue
+        seen.add(api_id)
+        suggestions.append(
+            {
+                "tmf_api_id": api_id,
+                "tmf_api_name": entry.get("name"),
+                "validated": True,
+            }
+        )
+    return suggestions
+
+
+def _normalize_resolve_result(result: dict[str, Any], limit: int) -> dict[str, Any]:
+    matches = result.get("matches", [])
+    if isinstance(matches, list):
+        normalized_matches: list[dict[str, Any]] = []
+        for match in matches[:limit]:
+            if not isinstance(match, dict):
+                continue
+            enriched = dict(match)
+            tmf_validation = _build_tmf_validation(_match_service_tmf_api(enriched))
+            if tmf_validation is not None:
+                enriched["tmf_validation"] = tmf_validation
+            normalized_matches.append(enriched)
+        result["matches"] = normalized_matches
+        if normalized_matches and "resolved_by" in result:
+            result.pop("resolved_by", None)
+
+    if "closest_related_services" in result and "related_services" not in result:
+        result["related_services"] = result.pop("closest_related_services")
+    else:
+        result.pop("closest_related_services", None)
+
+    result.pop("suggestions", None)
+    result.setdefault("reference_suggestions", _build_reference_suggestions(result))
+    result.setdefault("related_services", [])
+    return result
+
+
 def _resolve_via_opencode(query: str, opencode_url: str = OPENCODE_URL) -> dict | None:
     """Call the OpenCode registry agent for semantic matching.
 
@@ -172,7 +327,7 @@ def _resolve_via_opencode(query: str, opencode_url: str = OPENCODE_URL) -> dict 
         resp = requests.post(
             f"{opencode_url}/session",
             json={"title": "registry-resolve"},
-            timeout=5,
+            timeout=OPENCODE_REQUEST_TIMEOUT_SECONDS,
         )
         if resp.status_code not in (200, 201):
             logger.warning("opencode session create failed: %d", resp.status_code)
@@ -185,18 +340,27 @@ def _resolve_via_opencode(query: str, opencode_url: str = OPENCODE_URL) -> dict 
             return None
 
         try:
-            prompt = PROGRAMMATIC_RESOLVE_PROMPT.format(query=query)
+            prompt = PROGRAMMATIC_RESOLVE_PROMPT.format(
+                query=query,
+                tmf_catalog_json=TMF_CATALOG_JSON,
+            )
             resp = requests.post(
-                f"{opencode_url}/session/{session_id}/prompt_async",
+                f"{opencode_url}/session/{session_id}/message",
                 json={
                     "agent": OPENCODE_AGENT,
                     "parts": [{"type": "text", "text": prompt}],
                 },
-                timeout=5,
+                timeout=OPENCODE_REQUEST_TIMEOUT_SECONDS,
             )
             if resp.status_code != 200:
-                logger.warning("opencode prompt failed: %d", resp.status_code)
+                logger.warning("opencode message failed: %d", resp.status_code)
                 return None
+
+            response_data = resp.json()
+            if isinstance(response_data, dict):
+                parsed = _parse_json_from_text(_extract_response_text(response_data))
+                if parsed and "matches" in parsed:
+                    return parsed
 
             deadline = datetime.datetime.now() + datetime.timedelta(
                 seconds=OPENCODE_TIMEOUT_SECONDS
@@ -206,7 +370,7 @@ def _resolve_via_opencode(query: str, opencode_url: str = OPENCODE_URL) -> dict 
             while datetime.datetime.now() < deadline:
                 resp = requests.get(
                     f"{opencode_url}/session/{session_id}/message",
-                    timeout=5,
+                    timeout=OPENCODE_REQUEST_TIMEOUT_SECONDS,
                 )
                 if resp.status_code != 200:
                     logger.warning("opencode messages poll failed: %d", resp.status_code)
@@ -231,11 +395,11 @@ def _resolve_via_opencode(query: str, opencode_url: str = OPENCODE_URL) -> dict 
                         parsed = _parse_json_from_text(text or latest_text)
                         if parsed and "matches" in parsed:
                             return parsed
-                        logger.warning(
-                            "opencode response not valid resolve JSON: %s",
-                            (text or latest_text)[:200],
-                        )
-                        return None
+                        if text or latest_text:
+                            logger.warning(
+                                "opencode completed assistant response not valid resolve JSON: %s",
+                                (text or latest_text)[:200],
+                            )
 
                 time_left = (deadline - datetime.datetime.now()).total_seconds()
                 if time_left <= 0:
@@ -246,7 +410,10 @@ def _resolve_via_opencode(query: str, opencode_url: str = OPENCODE_URL) -> dict 
             return None
         finally:
             try:
-                requests.delete(f"{opencode_url}/session/{session_id}", timeout=5)
+                requests.delete(
+                    f"{opencode_url}/session/{session_id}",
+                    timeout=OPENCODE_REQUEST_TIMEOUT_SECONDS,
+                )
             except Exception:
                 pass
 
@@ -651,19 +818,13 @@ async def cli_dispatch(request: Request):
         smart = await asyncio.to_thread(_resolve_via_opencode, query)
 
         if smart is not None:
-            # LLM succeeded (or returned empty, which is still success)
-            matches = smart["matches"][:limit]
-            result = {
-                "query": query,
-                "matches": matches,
-                "resolved_by": "opencode-agent",
-            }
-            # If LLM found nothing, add guidance
-            if not matches:
-                result["note"] = (
-                    "No matches found. Use 'list' to see all services, "
-                    "or try a different query."
-                )
+            # Preserve the agent's richer response shape instead of collapsing
+            # it to matches-only. This keeps semantic intent, rationale, and
+            # related services available to callers.
+            result = {"query": query, **smart, "resolved_by": "opencode-agent"}
+            matches = result.get("matches", [])
+            if isinstance(matches, list):
+                result["matches"] = matches[:limit]
         else:
             # Fallback: OpenCode unavailable, use keyword scoring.
             # prerequisites is not present because dependency notes require
@@ -672,6 +833,8 @@ async def cli_dispatch(request: Request):
                 cmd_resolve, query, limit=limit, include_raw=include_raw
             )
             result["resolved_by"] = "fallback"
+
+        result = _normalize_resolve_result(result, limit)
 
     elif cmd == "register":
         body = args.get("body")

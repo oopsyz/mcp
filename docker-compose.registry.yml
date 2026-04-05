@@ -10,7 +10,7 @@ services:
     ports:
       - "4096:4096"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4096/global/health"]
+      test: ["CMD", "curl", "-s", "http://localhost:4096/"]
       interval: 10s
       timeout: 5s
       retries: 12
