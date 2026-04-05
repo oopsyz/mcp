@@ -1,8 +1,10 @@
 {
+  "autoupdate": false,
+  "model": "__OPENCODE_MODEL__",
   "mcp": {
     "tmf620": {
       "type": "remote",
-      "url": "http://127.0.0.1:7701/mcp"
+      "url": "__TMF_MCP_URL__"
     }
   },
   "$schema": "https://opencode.ai/config.json"

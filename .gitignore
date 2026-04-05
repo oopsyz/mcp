@@ -56,7 +56,6 @@ opencode.local.json
 .opencode-runtime/
 .config/opencode/
 .local/share/opencode/
-docker-compose.registry.override.yml
 .githooks/
 scripts/check-secret-files.ps1
 

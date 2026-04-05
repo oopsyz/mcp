@@ -25,20 +25,16 @@ dev = [
 tmf620-mock-server = "tmf620.mock_api:main"
 tmf620-mcp-server = "tmf620.server:main"
 tmf620-benchmark = "tmf620.benchmark:main"
-registry-server = "registry_agent.server:main"
-registry-cli = "registry_agent.core:cli_main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["tmf620", "registry_agent"]
+packages = ["tmf620"]
 include = [
     "tmf620/*.py",
-    "registry_agent/*.py",
     "tmf620/config/*.json",
-    "registry_agent/data/registry.md"
 ]
 
 [tool.ruff]

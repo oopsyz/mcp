@@ -13,3 +13,18 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  opencode:
+    build:
+      context: .
+      dockerfile: Dockerfile.opencode
+    depends_on:
+      tmf620-mcp:
+        condition: service_healthy
+    ports:
+      - "4096:4096"
+    environment:
+      - TMF_MCP_URL=http://tmf620-mcp:7701/mcp
+      - MODEL=${MODEL:-opencode/minimax-m2.5-free}
+      - AUTH_PROVIDER=${AUTH_PROVIDER:-zai-coding-plan}
+      - API_KEY=${API_KEY:-}

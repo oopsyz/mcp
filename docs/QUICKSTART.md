@@ -2,13 +2,12 @@
 
 ## Docker
 
-Use the TMF620 compose file for the mock API + MCP server, and a separate compose file for the registry service.
+Use the TMF620 compose file for the mock API + MCP server.
 
 Once it is up, paste `http://localhost:7701/cli/tmf620/catalogmgt` into a Codex, Claude, or Cursor chat window and start talking to it.
 
 ```bash
 docker compose -f docker-compose.yml up --build
-docker compose -f docker-compose.registry.yml up --build
 ```
 
 TMF620 stack exposes:
@@ -17,18 +16,7 @@ TMF620 stack exposes:
 - MCP transport at `http://localhost:7701/mcp`
 - HTTP CLI API at `http://localhost:7701/cli/tmf620/catalogmgt`
 
-Registry service exposes:
-
-- registry server at `http://localhost:7700`
-
 The containers use environment overrides rather than rewriting config files. Set them in the matching compose file, or use a `.env` file with Docker Compose
-
-For the registry stack, keep OpenCode model and auth values in the ignored
-`.env.opencode` file. Start from:
-
-```bash
-cp .env.opencode.example .env.opencode
-```
 
 ![Quick start](assets/quick_start.png)
 
@@ -120,8 +108,6 @@ uv run tmf620-mcp-server
 The MCP server will be available at `http://localhost:7701`, with MCP transport at `http://localhost:7701/mcp` and health at `http://localhost:7701/health`.
 
 This is a separate adapter from the mock API. The HTTP CLI API and MCP tools both go through this server.
-
-The registry stack is separate and uses `docker compose -f docker-compose.registry.yml up --build`. That stack includes an `opencode` sidecar so `resolve` can use LLM matching.
 
 ## Configuration
 

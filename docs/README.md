@@ -13,7 +13,6 @@ runtime entrypoints, canonical data, and repo-level contracts.
 ## Guides
 
 - [QUICKSTART.md](./QUICKSTART.md)
-- [REGISTRY_GUIDE.md](./REGISTRY_GUIDE.md)
 - [SPEC.zh-CN.md](./SPEC.zh-CN.md)
 
 ## Top-Level Files
@@ -22,12 +21,11 @@ runtime entrypoints, canonical data, and repo-level contracts.
 - [DOMAIN.md](../DOMAIN.md) - domain entrypoint and contract
 - [AGENTS.md](../AGENTS.md) - repo-specific agent instructions
 - [pyproject.toml](../pyproject.toml) - project configuration and console scripts
-- [opencode.json](../opencode.json) - OpenCode MCP client config
+- [opencode.json.template](../opencode.json.template) - OpenCode MCP client config template
 
 ## Runtime Packages
 
 - [tmf620/](../tmf620/) - TMF620 mock API, shared client, command layer, server, and benchmark
-- [registry_agent/](../registry_agent/) - agent-facing registry core and HTTP CLI server
 
 ## Notes
 

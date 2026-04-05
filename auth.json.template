@@ -1,0 +1,6 @@
+{
+  "__OPENCODE_AUTH_PROVIDER__": {
+    "type": "api",
+    "key": "__OPENCODE_AUTH_KEY__"
+  }
+}
