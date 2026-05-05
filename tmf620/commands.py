@@ -726,6 +726,45 @@ def _catalog_payload(
     return payload
 
 
+def _help_command_payload(*, verbose: bool = False) -> dict[str, Any]:
+    examples: list[dict[str, Any]] = [
+        {
+            "description": "List all available commands",
+            "request": {"command": "help"},
+        },
+        {
+            "description": "Inspect one command or group",
+            "request": {"command": "help", "args": {"command": "catalog list"}},
+        },
+    ]
+    payload: dict[str, Any] = {
+        "status": "ok",
+        "interface": "cli",
+        "version": "1.0",
+        "command": "help",
+        "summary": "Show command catalog or per-command help",
+        "description": (
+            "Return the CLI command catalog, or detailed help for one command path "
+            "using args.command."
+        ),
+        "arguments": [
+            {
+                "name": "command",
+                "type": "string",
+                "required": False,
+                "default": None,
+                "description": (
+                    "Optional command path to inspect, for example 'catalog list'."
+                ),
+            }
+        ],
+        "examples": examples,
+    }
+    if verbose:
+        payload["subcommands"] = _catalog_entries()
+    return payload
+
+
 def _find_group_node(path: list[str]) -> dict[str, Any] | None:
     current_nodes = COMMAND_TREE
     node: dict[str, Any] | None = None
@@ -816,6 +855,8 @@ def get_command_help_payload(command: str, *, verbose: bool = False) -> dict[str
     path = _split_command_path(command)
     if not path:
         return get_catalog_payload(verbose=verbose)
+    if path == ["help"]:
+        return _help_command_payload(verbose=verbose)
     return _command_payload(build_parser(), path, verbose=verbose)
 
 
@@ -853,7 +894,26 @@ def invoke_command(
         else:
             namespace_data.setdefault(dest, None)
 
+    expected_args: set[str] = set()
+    accepts_payload = False
+    for arg_spec in node["args"]:
+        dest = _arg_dest(arg_spec)
+        if dest:
+            expected_args.add(dest)
+        if dest in {"body_json", "body_file"}:
+            accepts_payload = True
+
+    if accepts_payload:
+        expected_args.add("body")
+
     provided_args = dict(args or {})
+    unexpected_args = sorted(key for key in provided_args if key not in expected_args)
+    if unexpected_args:
+        raise CommandInvocationError(
+            "invalid_argument",
+            f"Unknown argument(s): {', '.join(unexpected_args)}",
+        )
+
     body_payload = provided_args.pop("body", None)
     if body_payload is not None:
         namespace_data["body_json"] = json.dumps(body_payload)
@@ -861,19 +921,6 @@ def invoke_command(
         namespace_data["body_json"] = provided_args.pop("body_json")
     if "body_file" in provided_args:
         namespace_data["body_file"] = provided_args.pop("body_file")
-
-    expected_args = {"body", "body_json", "body_file"}
-    for arg_spec in node["args"]:
-        dest = _arg_dest(arg_spec)
-        if dest:
-            expected_args.add(dest)
-
-    unexpected_args = sorted(key for key in provided_args if key not in expected_args)
-    if unexpected_args:
-        raise CommandInvocationError(
-            "invalid_argument",
-            f"Unknown argument(s): {', '.join(unexpected_args)}",
-        )
 
     for key, value in provided_args.items():
         namespace_data[key] = value

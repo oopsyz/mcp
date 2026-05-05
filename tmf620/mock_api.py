@@ -242,11 +242,12 @@ class ProductOfferingFVO(Extensible):
     isSellable: Optional[bool] = None
     validFor: Optional[ValidFor] = None
     version: Optional[str] = None
+    catalogId: Optional[str] = None
     category: list[CategoryRefFVO] = []
     productSpecification: Optional[ProductSpecificationRefFVO] = None
-    lastUpdate: datetime
-    lifecycleStatus: str
-    type_name: str = Field(alias="@type")
+    lastUpdate: Optional[datetime] = None
+    lifecycleStatus: str = "Active"
+    type_name: str = Field(default="ProductOffering", alias="@type")
 
 
 class ProductOfferingMVO(Extensible):
