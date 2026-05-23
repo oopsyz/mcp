@@ -39,7 +39,9 @@ pip install uv
 
 `uv` will create a local `.venv/` automatically when you run `uv sync`.
 
-### Start The Mock API
+### Start The Local Stack
+
+Terminal 1 - start the mock TMF620 API:
 
 ```bash
 uv sync
@@ -48,7 +50,13 @@ uv run tmf620-mock-server
 
 The default TMF620 API base URL is `http://localhost:8801/tmf-api/productCatalogManagement/v5`.
 
-The MCP server also exposes the HTTP CLI API pattern at `http://localhost:7701/cli/tmf620/catalogmgt`.
+Terminal 2 - start the MCP server and HTTP CLI API:
+
+```bash
+uv run tmf620-mcp-server
+```
+
+The MCP server exposes the HTTP CLI API pattern at `http://localhost:7701/cli/tmf620/catalogmgt`.
 
 ### Use The HTTP CLI API
 
@@ -94,7 +102,7 @@ curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
 # Create an offering
 curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
   -H "Content-Type: application/json" \
-  -d '{"command":"offering create","args":{"body":{"name":"Premium Ethernet","description":"Managed enterprise access","lifecycleStatus":"Active","productOfferingPrice":[{"id":"pop-001","href":"http://localhost:8801/tmf-api/productCatalogManagement/v5/productOfferingPrice/pop-001","name":"Monthly fee","priceType":"recurring","price":{"taxIncludedAmount":{"unit":"USD","value":99.0}}}],"productCatalog":{"id":"cat-001"}}}}'
+  -d '{"command":"offering create","args":{"body":{"name":"Premium Ethernet","description":"Managed enterprise access","catalogId":"cat-001","lifecycleStatus":"Active","version":"1.0"}}}'
 ```
 
 ### Start The MCP Server
@@ -108,6 +116,63 @@ uv run tmf620-mcp-server
 The MCP server will be available at `http://localhost:7701`, with MCP transport at `http://localhost:7701/mcp` and health at `http://localhost:7701/health`.
 
 This is a separate adapter from the mock API. The HTTP CLI API and MCP tools both go through this server.
+
+## Measure Context Effects
+
+Run the offline context benchmark to measure progressive discovery, output
+projection, and guided error recovery without starting the local stack:
+
+```bash
+uv run tmf620-benchmark context
+```
+
+The projection section compares full mock API payloads with projected payloads
+such as `fields=id,name`. Positive effect means projected responses use fewer
+tokens than full responses while preserving the fields needed for the task.
+
+This is an offline payload-size benchmark. It uses the in-process mock API and
+synthesized command-error envelopes, so it does not measure network latency,
+ASGI middleware overhead, live server serialization cost, or real upstream 5xx
+recovery payloads. Use the latency benchmark for live transport measurements.
+
+The default tokenizer is `cl100k_base`. Use `--encoding` to compare another
+tiktoken encoding. Baselines are only directly comparable when the encoding
+matches.
+
+The current baseline is stored at `benchmarks/context_baseline.json`.
+
+Resource-path commands are also exposed as curated CLI commands:
+
+```bash
+curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
+  -H "Content-Type: application/json" \
+  -d '{"command":"/catalogs list","args":{"fields":"id,name","limit":1}}'
+
+curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
+  -H "Content-Type: application/json" \
+  -d '{"command":"/catalogs/cat-001 get","args":{"fields":"id,name"}}'
+```
+
+Resource-path mode currently supports `/<resource> <action>` and
+`/<resource>/<id> <action>`. IDs must be one path segment. If an identifier
+contains `/` or another reserved path character, use the canonical command with
+an explicit ID argument instead:
+
+```bash
+curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
+  -H "Content-Type: application/json" \
+  -d '{"command":"catalog get","args":{"catalog_id":"cat-001/admin","fields":"id,name"}}'
+```
+
+Some user-friendly argument names are normalized before they reach the TMF620
+API. For example, `lifecycle_status` is sent as the TMF query parameter
+`lifecycleStatus`:
+
+```bash
+curl -s -X POST http://localhost:7701/cli/tmf620/catalogmgt \
+  -H "Content-Type: application/json" \
+  -d '{"command":"/catalogs list","args":{"lifecycle_status":"Active","fields":"id,name"}}'
+```
 
 ## Configuration
 

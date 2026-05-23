@@ -16,7 +16,13 @@ import tiktoken
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-from .commands import _tool_name, get_catalog_payload, get_command_help_payload
+from .commands import (
+    CommandInvocationError,
+    _tool_name,
+    get_catalog_payload,
+    get_command_help_payload,
+    invoke_command,
+)
 
 
 BASE = os.environ.get("TMF620_BASE_URL", "http://localhost:7701").rstrip("/")
@@ -448,6 +454,213 @@ def _token_count(encoding_name: str, payload: Any) -> tuple[int, int]:
     return len(dumped), len(encoded)
 
 
+def _payload_metric(encoding_name: str, payload: Any) -> dict[str, int]:
+    chars, tokens = _token_count(encoding_name, payload)
+    return {"chars": chars, "tokens": tokens}
+
+
+def _ok_envelope(command: str, result: Any) -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "interface": "cli",
+        "version": "1.0",
+        "command": command,
+        "result": result,
+    }
+
+
+def _error_envelope(code: str, message: str, command: str) -> dict[str, Any]:
+    return {
+        "status": "error",
+        "interface": "cli",
+        "version": "1.0",
+        "error": {
+            "code": code,
+            "message": message,
+        },
+        "next_actions": [
+            {
+                "type": "help",
+                "request": {"command": "help", "args": {"command": command}},
+            }
+        ],
+    }
+
+
+def build_context_report(encoding_name: str = DEFAULT_ENCODING) -> dict[str, Any]:
+    """Measure context-size effects without requiring a running local stack.
+
+    This benchmark intentionally uses FastAPI TestClient against the in-process
+    mock TMF620 API plus synthesized command-error envelopes. It is fast and
+    deterministic, but it does not measure network latency, ASGI middleware
+    overhead, live server serialization cost, or real upstream 5xx recovery.
+    Use the latency benchmark modes for live-stack transport measurements.
+    """
+    from fastapi.testclient import TestClient
+
+    from .mock_api import BASE_PATH, app as mock_app
+
+    client = TestClient(mock_app)
+
+    catalog = get_catalog_payload()
+    group_help = get_command_help_payload("catalog")
+    leaf_help = get_command_help_payload("catalog list")
+    resource_group_help = get_command_help_payload("/catalogs")
+    resource_leaf_help = get_command_help_payload("/catalogs list")
+    if (
+        group_help is None
+        or leaf_help is None
+        or resource_group_help is None
+        or resource_leaf_help is None
+    ):
+        raise AssertionError("expected catalog help payloads to be available")
+
+    catalog_metric = _payload_metric(encoding_name, catalog)
+    group_metric = _payload_metric(encoding_name, group_help)
+    leaf_metric = _payload_metric(encoding_name, leaf_help)
+    resource_group_metric = _payload_metric(encoding_name, resource_group_help)
+    resource_leaf_metric = _payload_metric(encoding_name, resource_leaf_help)
+
+    def projection_case(
+        *,
+        label: str,
+        command: str,
+        path: str,
+        fields: str,
+    ) -> dict[str, Any]:
+        full_response = client.get(path)
+        full_response.raise_for_status()
+        projected_response = client.get(path, params={"fields": fields})
+        projected_response.raise_for_status()
+
+        full_payload = _ok_envelope(command, full_response.json())
+        projected_payload = _ok_envelope(command, projected_response.json())
+        full_metric = _payload_metric(encoding_name, full_payload)
+        projected_metric = _payload_metric(encoding_name, projected_payload)
+        token_delta = full_metric["tokens"] - projected_metric["tokens"]
+        char_delta = full_metric["chars"] - projected_metric["chars"]
+
+        return {
+            "label": label,
+            "command": command,
+            "fields": fields,
+            "full": full_metric,
+            "projected": projected_metric,
+            "savings": {
+                "chars": char_delta,
+                "tokens": token_delta,
+                "token_percent": round((token_delta / full_metric["tokens"]) * 100, 2)
+                if full_metric["tokens"]
+                else 0,
+            },
+        }
+
+    projection_cases = [
+        projection_case(
+            label="catalog list id,name",
+            command="catalog list",
+            path=f"{BASE_PATH}/productCatalog",
+            fields="id,name",
+        ),
+        projection_case(
+            label="offering list id,name,catalogId",
+            command="offering list",
+            path=f"{BASE_PATH}/productOffering",
+            fields="id,name,catalogId",
+        ),
+        projection_case(
+            label="specification list id,name",
+            command="specification list",
+            path=f"{BASE_PATH}/productSpecification",
+            fields="id,name",
+        ),
+    ]
+
+    try:
+        invoke_command("catalog get")
+    except CommandInvocationError as exc:
+        error_payload = _error_envelope(exc.code, str(exc), "catalog get")
+    else:
+        raise AssertionError("expected catalog get without catalog_id to fail")
+
+    error_metric = _payload_metric(encoding_name, error_payload)
+    recovery_help_metric = _payload_metric(
+        encoding_name, get_command_help_payload("catalog get")
+    )
+
+    return {
+        "encoding": encoding_name,
+        "scope": {
+            "mode": "offline_inprocess_mock",
+            "transport": "fastapi_testclient",
+            "measures": [
+                "serialized payload characters",
+                "tokenized payload size",
+                "projection savings",
+                "progressive discovery size",
+            ],
+            "does_not_measure": [
+                "network latency",
+                "ASGI middleware overhead",
+                "live server serialization overhead",
+                "real upstream 5xx recovery payloads",
+                "streaming timeout behavior",
+            ],
+            "error_payload_source": "synthesized_command_invocation_error",
+        },
+        "encoding_note": (
+            f"Token counts use tiktoken encoding {encoding_name!r}. "
+            "Use --encoding to compare another tokenizer; baselines are only "
+            "directly comparable when the encoding matches."
+        ),
+        "discovery_progression": {
+            "compact_catalog": catalog_metric,
+            "group_help": group_metric,
+            "leaf_help": leaf_metric,
+            "catalog_plus_group": {
+                "chars": catalog_metric["chars"] + group_metric["chars"],
+                "tokens": catalog_metric["tokens"] + group_metric["tokens"],
+            },
+            "catalog_plus_group_plus_leaf": {
+                "chars": (
+                    catalog_metric["chars"] + group_metric["chars"] + leaf_metric["chars"]
+                ),
+                "tokens": (
+                    catalog_metric["tokens"]
+                    + group_metric["tokens"]
+                    + leaf_metric["tokens"]
+                ),
+            },
+        },
+        "projection_cases": projection_cases,
+        "projection_totals": {
+            "full_tokens": sum(case["full"]["tokens"] for case in projection_cases),
+            "projected_tokens": sum(
+                case["projected"]["tokens"] for case in projection_cases
+            ),
+            "saved_tokens": sum(
+                case["savings"]["tokens"] for case in projection_cases
+            ),
+        },
+        "resource_path_mode": {
+            "catalog_entries": len(
+                [
+                    command
+                    for command in catalog["commands"]
+                    if command["name"].startswith("/")
+                ]
+            ),
+            "sample_group_help": resource_group_metric,
+            "sample_leaf_help": resource_leaf_metric,
+        },
+        "error_recovery": {
+            "missing_required_argument_error": error_metric,
+            "targeted_help_after_error": recovery_help_metric,
+            "combined_tokens": error_metric["tokens"] + recovery_help_metric["tokens"],
+        },
+    }
+
+
 async def _fetch_live_mcp_tools() -> list[dict[str, Any]]:
     async with streamablehttp_client(f"{BASE}/mcp") as (read, write, _):
         async with ClientSession(read, write) as session:
@@ -617,6 +830,70 @@ def _format_compare_table(compare: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _format_context_report(report: dict[str, Any]) -> str:
+    discovery = report["discovery_progression"]
+    projection_cases = report["projection_cases"]
+    projection_totals = report["projection_totals"]
+    resource_path_mode = report["resource_path_mode"]
+    error_recovery = report["error_recovery"]
+
+    lines = [
+        "=" * 78,
+        "Context Hygiene Benchmark",
+        "=" * 78,
+        "",
+        "Scope",
+        f"  mode:      {report['scope']['mode']}",
+        f"  transport: {report['scope']['transport']}",
+        f"  encoding:  {report['encoding']}",
+        "  note:      offline payload-size benchmark; not a live latency benchmark",
+        "",
+        "Discovery progression",
+        f"  compact catalog:             {discovery['compact_catalog']['tokens']:>6} tokens  {discovery['compact_catalog']['chars']:>6} chars",
+        f"  catalog + group help:        {discovery['catalog_plus_group']['tokens']:>6} tokens  {discovery['catalog_plus_group']['chars']:>6} chars",
+        f"  catalog + group + leaf help: {discovery['catalog_plus_group_plus_leaf']['tokens']:>6} tokens  {discovery['catalog_plus_group_plus_leaf']['chars']:>6} chars",
+        "",
+        "Projection savings",
+        f"  {'case':<34s} {'full':>8s} {'projected':>10s} {'saved':>8s} {'saved %':>8s}",
+        f"  {'-' * 72}",
+    ]
+    for case in projection_cases:
+        lines.append(
+            "  "
+            f"{case['label']:<34s} "
+            f"{case['full']['tokens']:>8} "
+            f"{case['projected']['tokens']:>10} "
+            f"{case['savings']['tokens']:>8} "
+            f"{case['savings']['token_percent']:>7.2f}%"
+        )
+    total_percent = (
+        projection_totals["saved_tokens"] / projection_totals["full_tokens"]
+    ) * 100
+    lines.extend(
+        [
+            f"  {'-' * 72}",
+            "  "
+            f"{'TOTAL':<34s} "
+            f"{projection_totals['full_tokens']:>8} "
+            f"{projection_totals['projected_tokens']:>10} "
+            f"{projection_totals['saved_tokens']:>8} "
+            f"{total_percent:>7.2f}%",
+            "",
+            "Resource-path mode",
+            f"  resource entries in catalog: {resource_path_mode['catalog_entries']:>6}",
+            f"  sample group help:           {resource_path_mode['sample_group_help']['tokens']:>6} tokens",
+            f"  sample leaf help:            {resource_path_mode['sample_leaf_help']['tokens']:>6} tokens",
+            "",
+            "Error recovery",
+            f"  missing-arg error envelope:  {error_recovery['missing_required_argument_error']['tokens']:>6} tokens",
+            f"  targeted help after error:   {error_recovery['targeted_help_after_error']['tokens']:>6} tokens",
+            f"  combined recovery path:      {error_recovery['combined_tokens']:>6} tokens",
+            "=" * 78,
+        ]
+    )
+    return "\n".join(lines)
+
+
 def main_token(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=(
@@ -661,6 +938,34 @@ def main_token(argv: list[str] | None = None) -> None:
         return
 
     print(json.dumps(report, indent=2))
+
+
+def main_context(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Measure context hygiene effects for progressive discovery, projected "
+            "outputs, and guided error recovery without requiring a running stack."
+        )
+    )
+    parser.add_argument(
+        "--encoding",
+        default=DEFAULT_ENCODING,
+        help=f"Tokenizer encoding name to use. Default: {DEFAULT_ENCODING}.",
+    )
+    parser.add_argument(
+        "--output",
+        choices=("json", "pretty"),
+        default="pretty",
+        help="Output format.",
+    )
+    args = parser.parse_args(argv)
+
+    report = build_context_report(args.encoding)
+    if args.output == "json":
+        print(json.dumps(report, separators=(",", ":"), sort_keys=True))
+        return
+
+    print(_format_context_report(report))
 
 
 def main_latency(argv: list[str] | None = None) -> None:
@@ -757,6 +1062,21 @@ def main(argv: list[str] | None = None) -> None:
         help="Measure a fresh MCP connection per iteration, including initialize and discovery.",
     )
 
+    context_parser = subparsers.add_parser(
+        "context", help="Run the offline context hygiene benchmark"
+    )
+    context_parser.add_argument(
+        "--encoding",
+        default=DEFAULT_ENCODING,
+        help=f"Tokenizer encoding name to use. Default: {DEFAULT_ENCODING}.",
+    )
+    context_parser.add_argument(
+        "--output",
+        choices=("json", "pretty"),
+        default="pretty",
+        help="Output format.",
+    )
+
     args = parser.parse_args(argv)
 
     if args.mode == "token":
@@ -779,6 +1099,15 @@ def main(argv: list[str] | None = None) -> None:
         if args.cold_start:
             latency_args.append("--cold-start")
         main_latency(latency_args)
+        return
+
+    if args.mode == "context":
+        context_args: list[str] = []
+        if args.encoding != DEFAULT_ENCODING:
+            context_args.extend(["--encoding", args.encoding])
+        if args.output != "pretty":
+            context_args.extend(["--output", args.output])
+        main_context(context_args)
         return
 
 

@@ -67,6 +67,63 @@ Decide intentionally which commands belong in the agent-facing registry. Startin
 
 Streaming should only happen when the caller sets `"stream": true`.
 
+### 7. Output is curated
+
+Agent-facing output should be as small as the task allows. Default output can be
+semantic and readable, while structured output and projection arguments let
+agents request only the fields they need before the response enters context.
+
+Useful conventions include:
+
+- `fields` for first-level field projection
+- `limit` and `offset` for bounded list reads
+- `filter` or domain-specific filters for narrowing
+- `jq` or a similar query option only when it can be implemented safely and
+  consistently across platforms
+
+### 8. Resource paths are optional command grammar
+
+For broad REST-like APIs, consider adding resource-path commands alongside
+curated intent commands. The resource path identifies the target; a small verb
+set identifies the operation.
+
+```text
+POST /cli
+{"command":"/issues list","args":{"state":"open","fields":"id,title"}}
+
+POST /cli
+{"command":"/issues/42 get","args":{"fields":"id,title,state"}}
+```
+
+Keep this as a CLI grammar, not a raw backend proxy. The service still owns:
+
+- command discovery and help
+- stable resource names
+- argument validation
+- examples
+- risk metadata
+- output shaping
+- guided error responses
+
+Use resource-path commands for regular coverage. Keep named intent commands for
+operations that do not naturally fit a resource action, such as `login`,
+`clone`, `checkout`, `merge`, `import`, `export`, or domain-specific workflows.
+
+The current TMF620 reference implementation supports only two resource-path
+shapes:
+
+- `/<resource> <action>`
+- `/<resource>/<id> <action>`
+
+Nested resource paths such as `/<parent>/<parent_id>/<child>` are a future
+extension point. Resource IDs must fit in one path segment. If an ID contains a
+slash or another reserved path character, callers should use a canonical command
+with an explicit ID argument instead of resource-path mode.
+
+Resource-path commands may still expose curated argument normalization. For
+example, the TMF620 reference uses `lifecycle_status` in `args` and sends it to
+the backing API as `lifecycleStatus`.
+
 ---
 
 ## Building It
@@ -470,9 +527,18 @@ At larger tool counts, add a `semantic_find` command so the agent can narrow bef
 
 - [ ] `GET /cli` returns a compact catalog
 - [ ] `POST {"command":"help"}` returns the same catalog
+- [ ] `POST {"command":"help","args":{"command":"help"}}` returns help for `help`
 - [ ] `POST {"command":"help","args":{"command":"<name>"}}` returns detailed help
 - [ ] Unknown help targets return `help_target_not_found`
 - [ ] Unknown commands return `command_not_found`
+
+### Context hygiene
+
+- [ ] Non-payload commands reject payload-only args such as `body`
+- [ ] List commands support bounded results with `limit` and `offset`
+- [ ] Read commands expose projection where the backend or adapter supports it
+- [ ] Benchmarks or tests measure full vs projected response size
+- [ ] Local contract tests do not require a running external stack
 
 ### Error handling
 

@@ -2,6 +2,7 @@ import argparse
 import json
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import unquote
 
 from .core import TMF620Client, TMF620Error
 
@@ -40,6 +41,7 @@ RESOURCE_SPECS = [
             "category list --limit 5",
             "category list --filter name=Internet",
         ],
+        "path_aliases": ("categories", "category"),
     },
     {
         "command": "catalog",
@@ -53,6 +55,7 @@ RESOURCE_SPECS = [
             "catalog list --lifecycle-status Active --limit 5",
         ],
         "supports_lifecycle": True,
+        "path_aliases": ("catalogs", "catalog"),
     },
     {
         "command": "offering",
@@ -68,6 +71,7 @@ RESOURCE_SPECS = [
         ],
         "supports_lifecycle": True,
         "supports_catalog_filter": True,
+        "path_aliases": ("offerings", "offering"),
     },
     {
         "command": "price",
@@ -81,6 +85,7 @@ RESOURCE_SPECS = [
             "price list --limit 10",
         ],
         "supports_lifecycle": True,
+        "path_aliases": ("prices", "price"),
     },
     {
         "command": "specification",
@@ -94,6 +99,7 @@ RESOURCE_SPECS = [
             "specification list --lifecycle-status Active --limit 5",
         ],
         "supports_lifecycle": True,
+        "path_aliases": ("specifications", "specification"),
     },
     {
         "command": "import-job",
@@ -107,6 +113,7 @@ RESOURCE_SPECS = [
             "import-job get import-001",
         ],
         "actions": ("list", "get", "create", "delete"),
+        "path_aliases": ("import-jobs", "import-job"),
     },
     {
         "command": "export-job",
@@ -120,8 +127,26 @@ RESOURCE_SPECS = [
             "export-job get export-001",
         ],
         "actions": ("list", "get", "create", "delete"),
+        "path_aliases": ("export-jobs", "export-job"),
     },
 ]
+
+RESOURCE_PATH_ALIASES: dict[str, str] = {
+    alias: resource_spec["command"]
+    for resource_spec in RESOURCE_SPECS
+    for alias in resource_spec.get("path_aliases", ())
+}
+
+RESOURCE_PATH_PRIMARY_ALIASES = [
+    resource_spec["path_aliases"][0]
+    for resource_spec in RESOURCE_SPECS
+    if resource_spec.get("path_aliases")
+]
+
+# Maps user-facing resource actions to canonical curated command actions.
+RESOURCE_ACTION_ALIASES: dict[str, str] = {
+    "update": "patch",
+}
 
 
 GLOBAL_OPTIONS: list[dict[str, Any]] = [
@@ -222,10 +247,12 @@ def _handle_resource_list(args: argparse.Namespace) -> Any:
     filters = _parse_filters(getattr(args, "filters", None))
     lifecycle_status = getattr(args, "lifecycle_status", None)
     if lifecycle_status:
+        # TMF620 uses camelCase query names; CLI args stay Python/JSON friendly.
         filters["lifecycleStatus"] = lifecycle_status
 
     catalog_id = getattr(args, "catalog_id", None)
     if catalog_id:
+        # TMF620 product offering filtering expects the nested catalog reference path.
         filters["catalog.id"] = catalog_id
 
     return _client(args).list_resource(
@@ -346,7 +373,7 @@ def _list_args(resource_spec: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "flags": ["--lifecycle-status"],
                 "dest": "lifecycle_status",
-                "help": "Optional lifecycle status filter.",
+                "help": "Optional lifecycle status filter. Maps to TMF query parameter lifecycleStatus.",
             }
         )
 
@@ -355,7 +382,7 @@ def _list_args(resource_spec: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "flags": ["--catalog-id"],
                 "dest": "catalog_id",
-                "help": "Optional catalog identifier used as catalog.id filter.",
+                "help": "Optional catalog identifier used as TMF catalog.id filter.",
             }
         )
 
@@ -576,6 +603,92 @@ def _split_command_path(command: str) -> list[str]:
     return [token for token in command.split() if token]
 
 
+def _split_resource_path(raw_path: str) -> list[str]:
+    return [segment for segment in raw_path.strip().split("/") if segment]
+
+
+def _resource_path_action(action: str) -> str:
+    return RESOURCE_ACTION_ALIASES.get(action, action)
+
+
+def _validate_resource_path_id(raw_resource_id: str) -> None:
+    if "/" in unquote(raw_resource_id):
+        raise CommandInvocationError(
+            "invalid_command",
+            (
+                "Resource-path IDs must not contain '/'. Use the canonical command "
+                "with an explicit ID argument for identifiers containing reserved "
+                "path characters."
+            ),
+        )
+
+
+def _resource_path_command_args(
+    command: str, args: dict[str, Any] | None = None
+) -> tuple[str, dict[str, Any]]:
+    path = _split_command_path(command)
+    if len(path) != 2:
+        raise CommandInvocationError(
+            "invalid_command",
+            "Resource-path commands must use '<resource-path> <action>'.",
+        )
+
+    raw_resource_path, raw_action = path
+    segments = _split_resource_path(raw_resource_path)
+    if len(segments) not in {1, 2}:
+        raise CommandInvocationError(
+            "command_not_found",
+            (
+                f"Unsupported resource path: {raw_resource_path}. "
+                "Resource-path mode supports '/resource' and '/resource/id'. "
+                "IDs must be a single path segment; URL-encode '/' as '%2F'."
+            ),
+        )
+
+    resource_alias = segments[0]
+    resource_command = RESOURCE_PATH_ALIASES.get(resource_alias)
+    if resource_command is None:
+        raise CommandInvocationError(
+            "command_not_found",
+            f"Unknown resource path: /{resource_alias}",
+        )
+
+    resource_spec = _resource_spec_by_command(resource_command)
+    if resource_spec is None:
+        raise CommandInvocationError(
+            "command_not_found",
+            f"Unknown resource path: /{resource_alias}",
+        )
+
+    action = _resource_path_action(raw_action)
+    actions = resource_spec.get("actions", ("list", "get", "create", "patch", "delete"))
+    if action not in actions:
+        raise CommandInvocationError(
+            "command_not_found",
+            f"Unsupported action '{raw_action}' for resource path /{resource_alias}.",
+        )
+
+    translated_args = dict(args or {})
+    has_id = len(segments) == 2
+    if has_id:
+        _validate_resource_path_id(segments[1])
+
+    if action in {"get", "patch", "delete"}:
+        if not has_id:
+            raise CommandInvocationError(
+                "missing_required_argument",
+                f"Missing resource identifier in path for action '{raw_action}'.",
+            )
+        translated_args.setdefault(resource_spec["id_arg"], segments[1])
+    elif has_id:
+        raise CommandInvocationError(
+            "invalid_command",
+            f"Action '{raw_action}' must target a resource collection, not one resource.",
+        )
+
+    return f"{resource_command} {action}", translated_args
+
+
 def _find_command_node(path: list[str]) -> dict[str, Any] | None:
     current_nodes = COMMAND_TREE
     node: dict[str, Any] | None = None
@@ -680,6 +793,30 @@ def _tool_name(*segments: str) -> str:
     return "tmf620_" + "_".join(segment.replace("-", "_") for segment in segments)
 
 
+def _resource_spec_by_command(command: str) -> dict[str, Any] | None:
+    return next(
+        (resource_spec for resource_spec in RESOURCE_SPECS if resource_spec["command"] == command),
+        None,
+    )
+
+
+def _resource_path_entries() -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for alias in RESOURCE_PATH_PRIMARY_ALIASES:
+        command = RESOURCE_PATH_ALIASES[alias]
+        resource_spec = _resource_spec_by_command(command)
+        if resource_spec is None:
+            continue
+        entries.append(
+            {
+                "name": f"/{alias}",
+                "kind": "group",
+                "summary": f"Resource path commands for {resource_spec['command']} resources.",
+            }
+        )
+    return entries
+
+
 def _catalog_entries() -> list[dict[str, Any]]:
     commands: list[dict[str, Any]] = []
     for node in COMMAND_TREE:
@@ -690,6 +827,7 @@ def _catalog_entries() -> list[dict[str, Any]]:
                 "summary": node["help"],
             }
         )
+    commands.extend(_resource_path_entries())
     return commands
 
 
@@ -847,6 +985,90 @@ def _command_payload(
     }
 
 
+def _resource_path_group_payload(resource_alias: str) -> dict[str, Any] | None:
+    resource_command = RESOURCE_PATH_ALIASES.get(resource_alias)
+    if resource_command is None:
+        return None
+    resource_spec = _resource_spec_by_command(resource_command)
+    if resource_spec is None:
+        return None
+
+    actions = resource_spec.get("actions", ("list", "get", "create", "patch", "delete"))
+    subcommands: list[dict[str, Any]] = []
+    for action in actions:
+        target = f"/{resource_alias}"
+        if action in {"get", "patch", "delete"}:
+            target = f"/{resource_alias}/<{resource_spec['id_arg']}>"
+        display_action = "update" if action == "patch" else action
+        subcommands.append(
+            {
+                "name": f"{target} {display_action}",
+                "kind": "command",
+                "summary": f"{display_action.title()} {resource_spec['command']} resources.",
+            }
+        )
+
+    return {
+        "status": "ok",
+        "interface": "cli",
+        "version": "1.0",
+        "command": f"/{resource_alias}",
+        "kind": "group",
+        "summary": f"Resource path commands for {resource_spec['command']} resources.",
+        "description": (
+            "Resource-path commands are curated CLI commands over TMF620 resources, "
+            "not a raw API proxy."
+        ),
+        "subcommands": subcommands,
+    }
+
+
+def _resource_path_help_payload(command: str, *, verbose: bool = False) -> dict[str, Any] | None:
+    path = _split_command_path(command)
+    if len(path) == 1:
+        segments = _split_resource_path(path[0])
+        if len(segments) != 1:
+            return None
+        return _resource_path_group_payload(segments[0])
+
+    if len(path) != 2:
+        return None
+
+    raw_resource_path, raw_action = path
+    segments = _split_resource_path(raw_resource_path)
+    if not segments:
+        return None
+    resource_alias = segments[0]
+    resource_command = RESOURCE_PATH_ALIASES.get(resource_alias)
+    resource_spec = _resource_spec_by_command(resource_command) if resource_command else None
+    if resource_spec is None:
+        return None
+
+    action = _resource_path_action(raw_action)
+    canonical_command = f"{resource_command} {action}"
+    payload = get_command_help_payload(canonical_command, verbose=verbose)
+    if payload is None:
+        return None
+
+    resource_command_name = command
+    if action in {"get", "patch", "delete"} and len(segments) == 1:
+        resource_command_name = f"/{resource_alias}/<{resource_spec['id_arg']}> {raw_action}"
+
+    payload = dict(payload)
+    payload["command"] = resource_command_name
+    payload["summary"] = f"Resource path alias for {canonical_command}."
+    payload["description"] = (
+        f"Invoke the curated {canonical_command!r} command through resource-path grammar."
+    )
+    payload["examples"] = [
+        {
+            "description": f"Invoke {resource_command_name}",
+            "request": {"command": resource_command_name, "args": {}},
+        }
+    ]
+    return payload
+
+
 def get_catalog_payload(*, verbose: bool = False) -> dict[str, Any]:
     return _catalog_payload(build_parser(), verbose=verbose)
 
@@ -857,6 +1079,8 @@ def get_command_help_payload(command: str, *, verbose: bool = False) -> dict[str
         return get_catalog_payload(verbose=verbose)
     if path == ["help"]:
         return _help_command_payload(verbose=verbose)
+    if path[0].startswith("/"):
+        return _resource_path_help_payload(command, verbose=verbose)
     return _command_payload(build_parser(), path, verbose=verbose)
 
 
@@ -867,6 +1091,9 @@ def invoke_command(
     config_path: str | None = None,
     output: str = "json",
 ) -> Any:
+    if command.strip().startswith("/"):
+        command, args = _resource_path_command_args(command, args)
+
     path = _split_command_path(command)
     if not path:
         raise CommandInvocationError("invalid_command", "Command cannot be empty.")

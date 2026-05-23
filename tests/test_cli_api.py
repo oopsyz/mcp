@@ -125,6 +125,60 @@ def test_cli_api_catalog_commands(tmf620_available):
     assert data["error"]["code"] == "tool_invocation_failed"
 
 
+def test_cli_api_projection_fields(tmf620_available):
+    data = _post(
+        CLI_URL,
+        {"command": "catalog list", "args": {"fields": "id,name", "limit": 1}},
+    )[1]
+    assert data["status"] == "ok"
+    assert len(data["result"]) == 1
+    catalog = data["result"][0]
+    assert catalog["id"] is not None
+    assert catalog["name"] is not None
+    assert "description" not in catalog
+    assert "lifecycleStatus" not in catalog
+
+    data = _post(
+        CLI_URL,
+        {
+            "command": "offering list",
+            "args": {"fields": "id,name,catalogId", "limit": 1},
+        },
+    )[1]
+    assert data["status"] == "ok"
+    assert len(data["result"]) == 1
+    offering = data["result"][0]
+    assert offering["id"] is not None
+    assert offering["name"] is not None
+    assert offering["catalogId"] is not None
+    assert "description" not in offering
+    assert "productSpecification" not in offering
+
+
+def test_cli_api_resource_path_commands(tmf620_available):
+    help_payload = _post(
+        CLI_URL, {"command": "help", "args": {"command": "/catalogs"}}
+    )[1]
+    assert help_payload["status"] == "ok"
+    assert help_payload["kind"] == "group"
+
+    data = _post(
+        CLI_URL,
+        {"command": "/catalogs list", "args": {"fields": "id,name", "limit": 1}},
+    )[1]
+    assert data["status"] == "ok"
+    assert len(data["result"]) == 1
+    assert set(data["result"][0]).issuperset({"id", "name"})
+
+    data = _post(
+        CLI_URL,
+        {"command": "/catalogs/cat-001 get", "args": {"fields": "id,name"}},
+    )[1]
+    assert data["status"] == "ok"
+    assert data["result"]["id"] == "cat-001"
+    assert data["result"]["name"] == "Enterprise Services Catalog"
+
+
 def test_cli_api_offering_commands(tmf620_available):
     data = _post(CLI_URL, {"command": "offering list"})[1]
     assert data["status"] == "ok"

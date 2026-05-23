@@ -67,6 +67,42 @@ class TMF620Error(Exception):
     """Raised when the TMF620 API returns an error or cannot be reached."""
 
 
+class TMF620HTTPError(TMF620Error):
+    """Raised when the TMF620 API returns a non-2xx HTTP status."""
+
+    def __init__(self, status_code: int, detail: Any):
+        super().__init__(f"TMF620 API error: {status_code} - {detail}")
+        self.status_code = status_code
+        self.detail = detail
+        self.retryable = status_code >= 500
+
+
+class TMF620HTTPClientError(TMF620HTTPError):
+    """Raised for TMF620 API 4xx responses."""
+
+
+class TMF620HTTPServerError(TMF620HTTPError):
+    """Raised for TMF620 API 5xx responses."""
+
+
+class TMF620ConnectionError(TMF620Error):
+    """Raised when the TMF620 API cannot be reached."""
+
+    retryable = True
+
+
+class TMF620TimeoutError(TMF620Error):
+    """Raised when the TMF620 API request times out."""
+
+    retryable = True
+
+
+class TMF620ResponseError(TMF620Error):
+    """Raised when the TMF620 API response cannot be decoded."""
+
+    retryable = False
+
+
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     """Load configuration from file, then fill gaps from environment variables."""
     config: Dict[str, Any] = {}
@@ -218,27 +254,35 @@ class TMF620Client:
                 try:
                     if exc.response.content:
                         error_detail = exc.response.json()
+                        if error_detail is None:
+                            error_detail = exc.response.text or (
+                                f"HTTP {exc.response.status_code}"
+                            )
                 except ValueError:
                     error_detail = (
                         exc.response.text
                         if exc.response.text
                         else f"HTTP {exc.response.status_code}"
                     )
-                raise TMF620Error(
-                    f"TMF620 API error: {exc.response.status_code} - {error_detail}"
-                ) from exc
-            raise TMF620Error(f"TMF620 API HTTP error: {exc}") from exc
+                status_code = exc.response.status_code
+                error_cls = (
+                    TMF620HTTPClientError
+                    if 400 <= status_code < 500
+                    else TMF620HTTPServerError
+                )
+                raise error_cls(status_code, error_detail) from exc
+            raise TMF620HTTPError(0, str(exc)) from exc
         except requests.exceptions.ConnectionError as exc:
-            raise TMF620Error(
+            raise TMF620ConnectionError(
                 f"Could not connect to TMF620 API at {self.api_url}. "
                 "Is the server running on the configured URL?"
             ) from exc
         except requests.exceptions.Timeout as exc:
-            raise TMF620Error(
+            raise TMF620TimeoutError(
                 f"TMF620 API request timed out after {timeout or self.timeout} seconds"
             ) from exc
         except requests.exceptions.JSONDecodeError as exc:
-            raise TMF620Error("Invalid JSON response from TMF620 API") from exc
+            raise TMF620ResponseError("Invalid JSON response from TMF620 API") from exc
         except requests.exceptions.RequestException as exc:
             raise TMF620Error(f"Error making request to TMF620 API: {exc}") from exc
 

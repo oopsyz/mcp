@@ -167,7 +167,70 @@ Services MAY organize commands hierarchically using command paths such as:
 
 The wire contract treats each full command path as the command identity.
 
-### 6.1 Root Catalog Response
+### 6.1 Resource Commands vs Intent Commands
+
+Services MAY expose resource-oriented command paths when the backing domain has
+regular resource semantics. This is useful for broad API surfaces because the
+resource path identifies the object and a small verb set identifies the action.
+
+Examples:
+
+- `/catalogs list`
+- `/catalogs/cat-001 get`
+- `/offerings list`
+- `/offerings/po-001 delete`
+
+Resource-oriented command paths are still CLI commands. They MUST use the same
+request envelope, help mechanism, error envelope, and discovery rules as any
+other command.
+
+Resource identifiers in command paths SHOULD be treated as path segments. If an
+identifier contains a slash or other reserved path character, callers SHOULD
+use an explicit ID argument instead of embedding the identifier in the command
+path. Implementations SHOULD document the supported path depth. A two-level
+shape such as `/<resource>/<id>` is sufficient for many services; nested
+resources can be added as an extension without changing the core envelope.
+
+Services SHOULD keep resource actions small and predictable. Common actions are:
+
+- `list`
+- `get`
+- `create`
+- `update`
+- `delete`
+
+Services SHOULD also keep intent-oriented commands for actions that do not map
+cleanly to one resource operation, such as login, checkout, import, export,
+validation, or multi-step domain workflows.
+
+This specification does not define a raw API proxy. A resource-oriented CLI
+surface SHOULD provide curated names, validation, examples, risk metadata, and
+agent-readable errors rather than accepting arbitrary backend method/path/body
+input.
+
+### 6.2 Output Shaping
+
+Commands MAY expose output-shaping arguments to reduce response size before the
+payload enters agent context.
+
+Common output-shaping arguments include:
+
+- `fields` - first-level field projection, for example `id,name,status`
+- `limit` - maximum number of returned records
+- `offset` - number of records to skip before returning results
+- `filter` - repeatable or structured domain filters
+- `jq` - optional query/projection expression, when implemented safely
+
+If output-shaping arguments are supported, command help SHOULD document their
+semantics and examples. Implementations SHOULD prefer backend-supported
+projection when available. If projection is performed locally, the help response
+SHOULD make that behavior clear when it affects filtering, authorization, or
+performance expectations.
+
+Output shaping MUST NOT remove fields that are required by the response envelope
+itself. It only applies to command-specific result payloads.
+
+### 6.3 Root Catalog Response
 
 `GET /cli` and `POST /cli {"command":"help"}` MUST return the root catalog:
 
@@ -203,7 +266,7 @@ Rules:
 
 For `kind: "group"` entries, `name` is a discovery label, not an invokable command by itself unless the service explicitly documents it as one.
 
-### 6.2 Group Help Response
+### 6.4 Group Help Response
 
 If a service uses grouped command paths, `help` for a group SHOULD return its child entries:
 
@@ -235,7 +298,7 @@ Rules:
 - Group help MUST remain compact.
 - Group help MUST NOT expand full parameter schemas for every child command.
 
-### 6.3 Command Help Response
+### 6.5 Command Help Response
 
 Detailed help for a leaf command MUST return enough information for an agent to invoke it correctly:
 
