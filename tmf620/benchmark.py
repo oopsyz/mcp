@@ -487,6 +487,43 @@ def _error_envelope(code: str, message: str, command: str) -> dict[str, Any]:
     }
 
 
+def _projection_case(
+    *,
+    client: Any,
+    encoding_name: str,
+    label: str,
+    command: str,
+    path: str,
+    fields: str,
+) -> dict[str, Any]:
+    full_response = client.get(path)
+    full_response.raise_for_status()
+    projected_response = client.get(path, params={"fields": fields})
+    projected_response.raise_for_status()
+
+    full_payload = _ok_envelope(command, full_response.json())
+    projected_payload = _ok_envelope(command, projected_response.json())
+    full_metric = _payload_metric(encoding_name, full_payload)
+    projected_metric = _payload_metric(encoding_name, projected_payload)
+    token_delta = full_metric["tokens"] - projected_metric["tokens"]
+    char_delta = full_metric["chars"] - projected_metric["chars"]
+
+    return {
+        "label": label,
+        "command": command,
+        "fields": fields,
+        "full": full_metric,
+        "projected": projected_metric,
+        "savings": {
+            "chars": char_delta,
+            "tokens": token_delta,
+            "token_percent": round((token_delta / full_metric["tokens"]) * 100, 2)
+            if full_metric["tokens"]
+            else 0,
+        },
+    }
+
+
 def build_context_report(encoding_name: str = DEFAULT_ENCODING) -> dict[str, Any]:
     """Measure context-size effects without requiring a running local stack.
 
@@ -521,54 +558,26 @@ def build_context_report(encoding_name: str = DEFAULT_ENCODING) -> dict[str, Any
     resource_group_metric = _payload_metric(encoding_name, resource_group_help)
     resource_leaf_metric = _payload_metric(encoding_name, resource_leaf_help)
 
-    def projection_case(
-        *,
-        label: str,
-        command: str,
-        path: str,
-        fields: str,
-    ) -> dict[str, Any]:
-        full_response = client.get(path)
-        full_response.raise_for_status()
-        projected_response = client.get(path, params={"fields": fields})
-        projected_response.raise_for_status()
-
-        full_payload = _ok_envelope(command, full_response.json())
-        projected_payload = _ok_envelope(command, projected_response.json())
-        full_metric = _payload_metric(encoding_name, full_payload)
-        projected_metric = _payload_metric(encoding_name, projected_payload)
-        token_delta = full_metric["tokens"] - projected_metric["tokens"]
-        char_delta = full_metric["chars"] - projected_metric["chars"]
-
-        return {
-            "label": label,
-            "command": command,
-            "fields": fields,
-            "full": full_metric,
-            "projected": projected_metric,
-            "savings": {
-                "chars": char_delta,
-                "tokens": token_delta,
-                "token_percent": round((token_delta / full_metric["tokens"]) * 100, 2)
-                if full_metric["tokens"]
-                else 0,
-            },
-        }
-
     projection_cases = [
-        projection_case(
+        _projection_case(
+            client=client,
+            encoding_name=encoding_name,
             label="catalog list id,name",
             command="catalog list",
             path=f"{BASE_PATH}/productCatalog",
             fields="id,name",
         ),
-        projection_case(
+        _projection_case(
+            client=client,
+            encoding_name=encoding_name,
             label="offering list id,name,catalogId",
             command="offering list",
             path=f"{BASE_PATH}/productOffering",
             fields="id,name,catalogId",
         ),
-        projection_case(
+        _projection_case(
+            client=client,
+            encoding_name=encoding_name,
             label="specification list id,name",
             command="specification list",
             path=f"{BASE_PATH}/productSpecification",

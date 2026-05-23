@@ -26,6 +26,7 @@ def test_streaming_chunks_for_list_result():
         )
     )
 
+    assert all(chunk.endswith("\n") for chunk in chunks)
     parsed = [json.loads(chunk) for chunk in chunks]
     assert parsed[0]["type"] == "started"
     assert [chunk["type"] for chunk in parsed[1:]] == ["item", "item", "done"]

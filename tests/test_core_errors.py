@@ -13,26 +13,18 @@ from tmf620.core import (
 )
 
 
-class DummyResponse:
-    def __init__(self, status_code=200, payload=None, text="", content=b"x"):
-        self.status_code = status_code
-        self._payload = payload
-        self.text = text
-        self.content = content
-
-    def raise_for_status(self):
-        if self.status_code >= 400:
-            raise requests.exceptions.HTTPError(response=self)
-
-    def json(self):
-        if isinstance(self._payload, BaseException):
-            raise self._payload
-        return self._payload
+def _response(status_code=200, body=b'{"ok":true}', url="http://example/test"):
+    response = requests.Response()
+    response.status_code = status_code
+    response._content = body
+    response.url = url
+    response.headers["Content-Type"] = "application/json"
+    return response
 
 
 def test_http_4xx_raises_client_error(monkeypatch):
     def fake_request(*args, **kwargs):
-        return DummyResponse(status_code=404, payload={"error": "not found"})
+        return _response(status_code=404, body=b'{"error":"not found"}')
 
     monkeypatch.setattr(requests, "request", fake_request)
     client = TMF620Client(config={"tmf620_api": {"url": "http://example"}, "endpoints": {}})
@@ -47,7 +39,7 @@ def test_http_4xx_raises_client_error(monkeypatch):
 
 def test_http_5xx_raises_server_error(monkeypatch):
     def fake_request(*args, **kwargs):
-        return DummyResponse(status_code=503, text="unavailable", content=b"unavailable")
+        return _response(status_code=503, body=b"unavailable")
 
     monkeypatch.setattr(requests, "request", fake_request)
     client = TMF620Client(config={"tmf620_api": {"url": "http://example"}, "endpoints": {}})
@@ -80,7 +72,7 @@ def test_timeout_and_connection_errors_are_typed(monkeypatch):
 
 def test_invalid_json_response_is_typed(monkeypatch):
     def fake_request(*args, **kwargs):
-        return DummyResponse(payload=requests.exceptions.JSONDecodeError("bad", "", 0))
+        return _response(body=b"not json")
 
     monkeypatch.setattr(requests, "request", fake_request)
     client = TMF620Client(config={"tmf620_api": {"url": "http://example"}, "endpoints": {}})

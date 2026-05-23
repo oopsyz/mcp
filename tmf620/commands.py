@@ -138,9 +138,10 @@ RESOURCE_PATH_ALIASES: dict[str, str] = {
 }
 
 RESOURCE_PATH_PRIMARY_ALIASES = [
-    resource_spec["path_aliases"][0]
+    path_aliases[0]
     for resource_spec in RESOURCE_SPECS
-    if resource_spec.get("path_aliases")
+    for path_aliases in (resource_spec.get("path_aliases", ()),)
+    if path_aliases
 ]
 
 # Maps user-facing resource actions to canonical curated command actions.
@@ -641,7 +642,8 @@ def _resource_path_command_args(
             (
                 f"Unsupported resource path: {raw_resource_path}. "
                 "Resource-path mode supports '/resource' and '/resource/id'. "
-                "IDs must be a single path segment; URL-encode '/' as '%2F'."
+                "Use the canonical command with an explicit ID argument for "
+                "identifiers containing reserved path characters."
             ),
         )
 
@@ -986,6 +988,7 @@ def _command_payload(
 
 
 def _resource_path_group_payload(resource_alias: str) -> dict[str, Any] | None:
+    # Defensive because help requests can target arbitrary /resource labels.
     resource_command = RESOURCE_PATH_ALIASES.get(resource_alias)
     if resource_command is None:
         return None

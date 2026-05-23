@@ -149,6 +149,8 @@ def test_resource_path_rejects_nested_paths_with_encoding_hint():
 
     assert exc_info.value.code == "command_not_found"
     assert "Resource-path mode supports" in str(exc_info.value)
+    assert "explicit ID argument" in str(exc_info.value)
+    assert "URL-encode" not in str(exc_info.value)
 
 
 def test_resource_path_rejects_encoded_slash_in_id():
