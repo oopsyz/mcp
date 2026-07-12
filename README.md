@@ -7,9 +7,9 @@ This repo exposes the TMF620 command layer through two interfaces:
 
 Documentation index: [docs/README.md](docs/README.md)
 
-The repository also contains the draft [oa-engine CLI-over-HTTP control-plane
-specification](docs/OA_ENGINE_HTTP_CLI_SPEC.md), which extends this protocol
-for authenticated remote coordination without exposing SQLite.
+The engine-specific [oa-engine CLI-over-HTTP control-plane profile](https://github.com/oopsyz/oa-engine/blob/main/docs/oa-engine-http-cli-spec.md)
+is maintained in the `oa_engine` repository; this repository owns the generic
+CLI-style HTTP protocol.
 
 Repository layout:
 
