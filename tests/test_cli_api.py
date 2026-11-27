@@ -122,7 +122,7 @@ def test_cli_api_catalog_commands(tmf620_available):
     status, data = _post(
         CLI_URL, {"command": "catalog get", "args": {"catalog_id": "nonexistent"}}
     )
-    assert status == 200
+    assert status == 500
     assert data["status"] == "error"
     assert data["error"]["code"] == "tool_invocation_failed"
 

@@ -85,10 +85,11 @@ def test_command_whitespace_is_trimmed(tmf620_available):
     assert body["command"] == "health"
 
 
-def test_health_with_invalid_args_is_handled(tmf620_available):
+def test_health_rejects_unknown_argument(tmf620_available):
     code, body = post(BASE + "/cli/tmf620/catalogmgt", {"command": "health", "args": {"bogus": 123}})
-    assert code == 200
-    assert body["status"] in {"ok", "error"}
+    assert code == 400
+    assert body["status"] == "error"
+    assert body["error"]["code"] == "invalid_argument"
 
 
 @pytest.mark.parametrize(
@@ -142,6 +143,8 @@ def test_command_help_shape(tmf620_available):
     assert "result" not in body
 
 
-def test_catalog_group_command_response_is_valid(tmf620_available):
+def test_catalog_group_is_not_invokable(tmf620_available):
     code, body = post(BASE + "/cli/tmf620/catalogmgt", {"command": "catalog"})
-    assert code in (200, 400)
+    assert code == 404
+    assert body["status"] == "error"
+    assert body["error"]["code"] == "command_not_found"
