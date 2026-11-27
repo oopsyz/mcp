@@ -836,6 +836,7 @@ def _catalog_entries() -> list[dict[str, Any]]:
 def _catalog_payload(
     parser: argparse.ArgumentParser, *, verbose: bool = False
 ) -> dict[str, Any]:
+    entries = _catalog_entries()
     payload: dict[str, Any] = {
         "status": "ok",
         "interface": "cli",
@@ -858,8 +859,8 @@ def _catalog_payload(
                 '{"command":"help","args":{"command":"<command path>"}}'
             ),
         },
-        "commands": _catalog_entries(),
-        "total": len(COMMAND_TREE),
+        "commands": entries,
+        "total": len(entries),
     }
     if verbose:
         payload["description"] = parser.description
