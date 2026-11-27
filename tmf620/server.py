@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse, Response, StreamingResponse
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from .commands import (
     COMMAND_TREE,
@@ -38,7 +38,6 @@ logger = logging.getLogger("tmf620-mcp")
 
 config: Optional[dict[str, Any]] = None
 client: Optional[TMF620Client] = None
-mcp_session_manager: Any = None
 
 CLI_NAMESPACE = "tmf620/catalogmgt"
 CLI_ROUTE = f"/cli/{CLI_NAMESPACE}"
@@ -203,7 +202,7 @@ def _build_mcp_tool_callable(
 
 
 def _register_mcp_tool(
-    mcp_server: FastMCP,
+    mcp_server: MCPServer,
     *,
     tool_name: str,
     command: str,
@@ -228,7 +227,7 @@ def _register_mcp_tool(
     )
 
 
-def _register_mcp_tools(mcp_server: FastMCP) -> None:
+def _register_mcp_tools(mcp_server: MCPServer) -> None:
     _register_mcp_tool(
         mcp_server,
         tool_name="tmf620_health",
@@ -389,16 +388,13 @@ def _streaming_result_chunks(command: str, args: dict[str, Any], result: Any):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global config, client, mcp_session_manager
+    global config, client
     config = load_config()
     client = TMF620Client(config=config)
     try:
         client.test_connection()
         logger.info("Successfully connected to TMF620 API")
-        if mcp_session_manager is None:
-            yield
-            return
-        async with mcp_session_manager.run():
+        async with mcp_app.router.lifespan_context(mcp_app):
             yield
     except Exception as exc:
         logger.error("Failed to initialize TMF620 MCP server: %s", exc)
@@ -650,16 +646,15 @@ async def server_config():
     }
 
 
-mcp_server = FastMCP(
+mcp_server = MCPServer(
     name="TMF620 Product Catalog MCP Server",
     instructions=(
         "TMF620 Product Catalog Management tools with explicit per-command schemas."
     ),
-    streamable_http_path="/",
+    version="1.0.0",
 )
 _register_mcp_tools(mcp_server)
-mcp_app = mcp_server.streamable_http_app()
-mcp_session_manager = mcp_server.session_manager
+mcp_app = mcp_server.streamable_http_app(streamable_http_path="/")
 app.mount("/mcp", mcp_app)
 
 
