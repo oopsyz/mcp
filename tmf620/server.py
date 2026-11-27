@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import hashlib
 import inspect
 import json
 import logging
@@ -10,7 +11,7 @@ from typing import Any, Annotated, Optional
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from starlette.responses import JSONResponse, StreamingResponse
+from starlette.responses import JSONResponse, Response, StreamingResponse
 from mcp.server.fastmcp import FastMCP
 
 from .commands import (
@@ -430,8 +431,26 @@ async def health_check():
 @app.get(CLI_ROUTE, operation_id="cli_catalog", include_in_schema=False)
 @app.get(ROOT_CLI_ROUTE, operation_id="compat_root_cli_catalog", include_in_schema=False)
 @app.get(LEGACY_CLI_ROUTE, operation_id="compat_cli_catalog", include_in_schema=False)
-async def cli_catalog(verbose: bool = False):
-    return get_catalog_payload(verbose=verbose)
+async def cli_catalog(request: Request, verbose: bool = False, command: str | None = None):
+    if command is None:
+        payload = get_catalog_payload(verbose=verbose)
+    elif not command.strip():
+        return _json_error(400, "invalid_arguments", "Command help target must be non-empty.")
+    else:
+        payload = get_command_help_payload(command.strip(), verbose=verbose)
+        if payload is None:
+            return _json_error(404, "help_target_not_found", f"Unknown help target: {command}")
+
+    response = JSONResponse(payload)
+    tag = '"' + hashlib.sha256(response.body).hexdigest() + '"'
+    headers = {"ETag": tag, "Cache-Control": "private, max-age=60"}
+    validators = request.headers.get("if-none-match", "").strip()
+    if validators == "*" or any(
+        candidate.strip().removeprefix("W/") == tag for candidate in validators.split(",")
+    ):
+        return Response(status_code=304, headers=headers)
+    response.headers.update(headers)
+    return response
 
 
 @app.post(CLI_ROUTE, operation_id="cli_dispatch", include_in_schema=False)

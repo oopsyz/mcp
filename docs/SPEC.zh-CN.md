@@ -200,6 +200,12 @@ Content-Type: application/json
 
 对于 `kind: "group"` 条目，`name` 是发现标签，其本身不是可调用命令，除非服务明确将其文档化为可调用。
 
+#### 可缓存的 GET 帮助
+
+服务 SHOULD 在根目录中通过 `"help_get": true` 声明支持 GET 帮助。声明后，在同一端点使用 URL 编码的 `command` 查询参数发起 GET，成功时 MUST 返回与 POST help 相同的命令或分组帮助。未知目标 MUST 返回 `help_target_not_found`。未声明时，客户端可使用原有的 POST help。
+
+发现类 GET 响应 SHOULD 显式提供 `Cache-Control`。对于可复用的表示，服务 SHOULD 为每个表示提供独立的 `ETag`，并支持 `If-None-Match` 条件请求。匹配时返回 HTTP 304、相关缓存元数据和空响应体。参数约束的变更必须使对应帮助的旧验证器失效。客户端 MUST 遵守缓存指令，并按服务和授权上下文隔离与调用方有关的元数据。TMF620 采用 `private, max-age=60`，具体有效期由服务确定。
+
 ### 6.2 分组帮助响应
 
 若服务使用分组命令路径，对分组的 `help` SHOULD 返回其子条目：
@@ -448,6 +454,7 @@ Content-Type: application/x-ndjson
 
 一致性实现 SHOULD：
 
+- 声明并支持第 6.1 节的可缓存 GET 帮助
 - 保持根发现紧凑
 - 在命令帮助中提供具体示例
 - 在已知时包含参数默认值
