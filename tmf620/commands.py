@@ -843,6 +843,7 @@ def _catalog_payload(
         "service": SERVICE_ID,
         "namespace": SERVICE_NAMESPACE,
         "canonical_endpoint": CANONICAL_CLI_ENDPOINT,
+        "help_get": True,
         "how_to_invoke": {
             "endpoint": f"POST {CANONICAL_CLI_ENDPOINT}",
             "shape": {"command": "<command_name>", "args": {}, "stream": False},

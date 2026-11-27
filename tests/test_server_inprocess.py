@@ -155,3 +155,21 @@ def test_cli_dispatch_handles_concurrent_requests(monkeypatch):
         assert body["status"] == "ok"
         assert body["command"] == "health"
     assert calls == ["health"] * 10
+
+
+def test_cacheable_help_contract(monkeypatch):
+    from fastapi.testclient import TestClient
+    from scripts.check_discovery import check_discovery
+
+    http = TestClient(server.app)
+    tag = check_discovery(http, server.CLI_ROUTE, "catalog list")
+    original = server.get_command_help_payload
+
+    def revised(command, **kwargs):
+        payload = original(command, **kwargs)
+        if command == "catalog list":
+            return dict(payload, description="Updated help.")
+        return payload
+
+    monkeypatch.setattr(server, "get_command_help_payload", revised)
+    check_discovery(http, server.CLI_ROUTE, "catalog list", previous_etag=tag)

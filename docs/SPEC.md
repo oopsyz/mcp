@@ -266,6 +266,29 @@ Rules:
 
 For `kind: "group"` entries, `name` is a discovery label, not an invokable command by itself unless the service explicitly documents it as one.
 
+#### Cacheable GET help
+
+Services SHOULD support a GET form of targeted help and advertise it with
+`"help_get": true` in the root catalog. When advertised, GET on the same
+endpoint with a URL-encoded `command` query parameter MUST provide the same
+successful command or group help as POST help for that path. An unknown target
+MUST yield `help_target_not_found`. Clients that do not see the flag can use
+the existing POST help contract. This is an additive revision to Draft v1.
+
+Services SHOULD issue explicit `Cache-Control` directives on discovery GETs.
+For reusable representations, services SHOULD provide a representation-specific
+`ETag` and support conditional GET with `If-None-Match`. A matching validator
+returns HTTP 304 with no body and the applicable cache metadata. Each root,
+index and help URI has its own representation: changing an argument constraint
+must invalidate the validator for the affected help even if the index is unchanged.
+Services choose freshness and visibility according to their metadata; the TMF620
+example uses `private, max-age=60`. Clients MUST honor cache directives and
+isolate caller-dependent metadata by service and authorization context. These
+rules apply to discovery GETs. Invocation responses have their own semantics.
+
+Run the [HTTP conformance check](../scripts/check_discovery.py) against a local
+service with `python scripts/check_discovery.py <endpoint> "<command path>"`.
+
 ### 6.4 Group Help Response
 
 If a service uses grouped command paths, `help` for a group SHOULD return its child entries:
@@ -514,6 +537,7 @@ A conformant implementation MUST:
 
 A conformant implementation SHOULD:
 
+- advertise and support cacheable GET help as described in section 6.3
 - keep root discovery compact
 - provide concrete examples in command help
 - include argument defaults when known
