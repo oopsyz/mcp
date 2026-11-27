@@ -80,9 +80,10 @@ File: `tmf620/commands.py`
 
 File: `tmf620/server.py`
 
-- FastAPI + the official MCP SDK (`FastMCP`)
+- FastAPI + the official MCP Python SDK 2.x (`MCPServer`)
 - exposes `/cli/tmf620/catalogmgt` as the primary HTTP CLI endpoint
 - keeps `/cli` and `/api/cli` as compatibility aliases
+- serves MCP 2026-07-28 on `/mcp/` and accepts handshake-based clients
 - exposes explicit MCP tools for benchmarking and test coverage
 - delegates HTTP CLI requests into `tmf620/commands.py`
 - delegates MCP tools into the shared command layer

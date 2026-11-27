@@ -13,8 +13,7 @@ import os
 
 import requests
 import tiktoken
-from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp import Client
 
 from .commands import (
     CommandInvocationError,
@@ -241,7 +240,7 @@ def run_latency_benchmark(
 
         async def _bench_mcp(
             *,
-            session: ClientSession | None,
+            session: Client | None,
             label: str,
             tool_name: str,
             args: dict[str, Any],
@@ -254,36 +253,32 @@ def run_latency_benchmark(
             latencies: list[float] = []
             if cold_start:
                 for _ in range(warmup_calls):
-                    async with streamablehttp_client(f"{BASE}/mcp") as (read, write, _):
-                        async with ClientSession(read, write) as fresh_session:
-                            await fresh_session.initialize()
-                            available = {
-                                tool.name for tool in (await fresh_session.list_tools()).tools
-                            }
-                            if tool_name not in available:
-                                raise AssertionError(
-                                    f"expected MCP tool {tool_name!r} to be available; got {sorted(available)!r}"
-                                )
-                            warmup_result = await fresh_session.call_tool(tool_name, args)
-                            if not allow_error and getattr(warmup_result, "isError", False):
-                                raise AssertionError(
-                                    f"unexpected warm-up error result from {tool_name}: {warmup_result}"
-                                )
+                    async with Client(f"{BASE}/mcp/", mode="2026-07-28") as fresh_session:
+                        available = {
+                            tool.name for tool in (await fresh_session.list_tools()).tools
+                        }
+                        if tool_name not in available:
+                            raise AssertionError(
+                                f"expected MCP tool {tool_name!r} to be available; got {sorted(available)!r}"
+                            )
+                        warmup_result = await fresh_session.call_tool(tool_name, args)
+                        if not allow_error and warmup_result.is_error:
+                            raise AssertionError(
+                                f"unexpected warm-up error result from {tool_name}: {warmup_result}"
+                            )
                 for _ in range(iterations):
                     start = time.perf_counter()
-                    async with streamablehttp_client(f"{BASE}/mcp") as (read, write, _):
-                        async with ClientSession(read, write) as fresh_session:
-                            await fresh_session.initialize()
-                            available = {
-                                tool.name for tool in (await fresh_session.list_tools()).tools
-                            }
-                            if tool_name not in available:
-                                raise AssertionError(
-                                    f"expected MCP tool {tool_name!r} to be available; got {sorted(available)!r}"
-                                )
-                            result = await fresh_session.call_tool(tool_name, args)
+                    async with Client(f"{BASE}/mcp/", mode="2026-07-28") as fresh_session:
+                        available = {
+                            tool.name for tool in (await fresh_session.list_tools()).tools
+                        }
+                        if tool_name not in available:
+                            raise AssertionError(
+                                f"expected MCP tool {tool_name!r} to be available; got {sorted(available)!r}"
+                            )
+                        result = await fresh_session.call_tool(tool_name, args)
                     elapsed = time.perf_counter() - start
-                    if not allow_error and getattr(result, "isError", False):
+                    if not allow_error and result.is_error:
                         raise AssertionError(
                             f"unexpected error result from {tool_name}: {result}"
                         )
@@ -291,26 +286,26 @@ def run_latency_benchmark(
             else:
                 assert session is not None
                 for _ in range(warmup_calls):
-                    available = {tool.name for tool in (await session.list_tools()).tools}
+                    available = {tool.name for tool in (await session.list_tools(cache_mode="refresh")).tools}
                     if tool_name not in available:
                         raise AssertionError(
                             f"expected MCP tool {tool_name!r} to be available; got {sorted(available)!r}"
                         )
                     warmup_result = await session.call_tool(tool_name, args)
-                    if not allow_error and getattr(warmup_result, "isError", False):
+                    if not allow_error and warmup_result.is_error:
                         raise AssertionError(
                             f"unexpected warm-up error result from {tool_name}: {warmup_result}"
                         )
                 for _ in range(iterations):
                     start = time.perf_counter()
-                    available = {tool.name for tool in (await session.list_tools()).tools}
+                    available = {tool.name for tool in (await session.list_tools(cache_mode="refresh")).tools}
                     if tool_name not in available:
                         raise AssertionError(
                             f"expected MCP tool {tool_name!r} to be available; got {sorted(available)!r}"
                         )
                     result = await session.call_tool(tool_name, args)
                     elapsed = time.perf_counter() - start
-                    if not allow_error and getattr(result, "isError", False):
+                    if not allow_error and result.is_error:
                         raise AssertionError(
                             f"unexpected error result from {tool_name}: {result}"
                         )
@@ -376,29 +371,27 @@ def run_latency_benchmark(
                     if verbose:
                         _print_comparison(cli_result, mcp_result)
             else:
-                async with streamablehttp_client(f"{BASE}/mcp") as (read, write, _):
-                    async with ClientSession(read, write) as mcp_session:
-                        await mcp_session.initialize()
-                        for test in LATENCY_TESTS:
-                            cli_result = await _bench_http(
-                                label=f"cli: {test['label']}",
-                                url=CLI_URL,
-                                payload=test["cli_payload"],
-                                discovery_commands=_cli_discovery_commands(
-                                    test["mcp_segments"]
-                                ),
-                                allow_error=test.get("allow_error", False),
-                            )
-                            mcp_result = await _bench_mcp(
-                                session=mcp_session,
-                                label=f"mcp: {test['label']}",
-                                tool_name=_tool_name(*test["mcp_segments"]),
-                                args=test["mcp_payload"],
-                                allow_error=test.get("allow_error", False),
-                            )
-                            results.extend([cli_result, mcp_result])
-                            if verbose:
-                                _print_comparison(cli_result, mcp_result)
+                async with Client(f"{BASE}/mcp/", mode="2026-07-28") as mcp_session:
+                    for test in LATENCY_TESTS:
+                        cli_result = await _bench_http(
+                            label=f"cli: {test['label']}",
+                            url=CLI_URL,
+                            payload=test["cli_payload"],
+                            discovery_commands=_cli_discovery_commands(
+                                test["mcp_segments"]
+                            ),
+                            allow_error=test.get("allow_error", False),
+                        )
+                        mcp_result = await _bench_mcp(
+                            session=mcp_session,
+                            label=f"mcp: {test['label']}",
+                            tool_name=_tool_name(*test["mcp_segments"]),
+                            args=test["mcp_payload"],
+                            allow_error=test.get("allow_error", False),
+                        )
+                        results.extend([cli_result, mcp_result])
+                        if verbose:
+                            _print_comparison(cli_result, mcp_result)
 
             comparisons: list[dict[str, Any]] = []
             cli_results = [row for row in results if row["label"].startswith("cli:")]
@@ -671,11 +664,9 @@ def build_context_report(encoding_name: str = DEFAULT_ENCODING) -> dict[str, Any
 
 
 async def _fetch_live_mcp_tools() -> list[dict[str, Any]]:
-    async with streamablehttp_client(f"{BASE}/mcp") as (read, write, _):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            tools = await session.list_tools()
-            return [tool.model_dump(mode="json") for tool in tools.tools]
+    async with Client(f"{BASE}/mcp/", mode="2026-07-28") as session:
+        tools = await session.list_tools()
+        return [tool.model_dump(mode="json", by_alias=True) for tool in tools.tools]
 
 
 def build_report(encoding_name: str = DEFAULT_ENCODING) -> dict[str, Any]:
@@ -1006,7 +997,7 @@ def main_latency(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--cold-start",
         action="store_true",
-        help="Measure a fresh MCP connection per iteration, including initialize and discovery.",
+        help="Measure a fresh MCP connection per iteration, including tool discovery.",
     )
     args = parser.parse_args(argv)
 
@@ -1068,7 +1059,7 @@ def main(argv: list[str] | None = None) -> None:
     latency_parser.add_argument(
         "--cold-start",
         action="store_true",
-        help="Measure a fresh MCP connection per iteration, including initialize and discovery.",
+        help="Measure a fresh MCP connection per iteration, including tool discovery.",
     )
 
     context_parser = subparsers.add_parser(

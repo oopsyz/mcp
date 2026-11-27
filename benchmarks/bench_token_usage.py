@@ -4,8 +4,7 @@ import sys
 from typing import Any
 
 import requests
-from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp import Client
 
 BASE = "http://localhost:7701"
 CLI_URL = f"{BASE}/cli/tmf620/catalogmgt"
@@ -37,11 +36,9 @@ def _fmt(n: int) -> str:
 
 
 async def _fetch_live_mcp_tools() -> list[dict[str, Any]]:
-    async with streamablehttp_client(f"{BASE}/mcp") as (read, write, _):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            tools = await session.list_tools()
-            return [tool.model_dump(mode="json") for tool in tools.tools]
+    async with Client(f"{BASE}/mcp/", mode="2026-07-28") as session:
+        tools = await session.list_tools()
+        return [tool.model_dump(mode="json", by_alias=True) for tool in tools.tools]
 
 
 def main():

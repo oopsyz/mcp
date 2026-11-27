@@ -1,7 +1,9 @@
+import asyncio
 import json
 
 import pytest
 import requests
+from mcp import Client
 
 
 CLI_URL = "http://localhost:7701/cli/tmf620/catalogmgt"
@@ -383,3 +385,25 @@ def test_cli_api_help_for_help(tmf620_available):
     )
     assert code == 200
     assert body["status"] == "ok"
+
+
+@pytest.mark.parametrize(
+    ("mode", "revision"),
+    [("auto", "2026-07-28"), ("2026-07-28", "2026-07-28"), ("legacy", "2025-11-25")],
+)
+def test_mcp_catalog_compatibility(tmf620_available, mode, revision):
+    args = {"limit": 1, "fields": "id,name"}
+    status, cli = _post(CLI_URL, {"command": "catalog list", "args": args})
+    assert status == 200 and cli["result"]
+
+    async def call_catalog():
+        async with Client("http://localhost:7701/mcp/", mode=mode) as client:
+            assert client.protocol_version == revision
+            tools = await client.list_tools()
+            tool = next(tool for tool in tools.tools if tool.name == "tmf620_catalog_list")
+            assert args.keys() <= tool.input_schema["properties"].keys()
+            result = await client.call_tool(tool.name, args)
+            assert not result.is_error
+            return [json.loads(item.text) for item in result.content]
+
+    assert asyncio.run(call_catalog()) == cli["result"]
